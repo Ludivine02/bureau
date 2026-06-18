@@ -31,6 +31,7 @@
   <button data-view="tf">5 · Taxe forfaitaire</button>
   <button data-view="cadrage">6 · Cadrage compta</button>
   <button data-view="controles">7 · Contrôles <span class="badge zero" id="badge-controles">0</span></button>
+  <button data-view="artistes">8 · Artistes</button>
 </nav>
 
 <main>
@@ -249,6 +250,34 @@
     <h2>Cadrage avec la comptabilité (Balance Générale)</h2>
     <p class="lead">Trois volets : <b>A.</b> le CA par compte (classe 70), <b>B.</b> la TVA collectée, <b>C.</b> les achats &amp; coûts (classe 6). Les soldes de la Balance sont pré-chargés ; les écarts BG − outil s'affichent automatiquement.</p>
     <div id="cadrage-table"></div>
+  </div>
+</section>
+
+<!-- ============ 8. ARTISTES (référentiel) ============ -->
+<section class="view" id="view-artistes">
+  <div class="panel">
+    <h2>Référentiel artistes</h2>
+    <p class="lead">Renseignez une fois, par artiste, le statut au regard du <b>droit de suite</b> (artiste vivant ou décédé depuis ≤ 70 ans) et de la <b>taxe forfaitaire</b>. Ces valeurs se propagent automatiquement à toutes les ventes de l'artiste — sauf décision saisie ligne par ligne, qui reste prioritaire.</p>
+    <div class="toolbar">
+      <button class="btn secondary small" id="btn-recenser">Recenser les artistes de l'historique</button>
+      <div class="spacer"></div>
+    </div>
+    <div id="artistes-table"></div>
+    <fieldset style="margin-top:14px">
+      <legend>Ajouter / mettre à jour un artiste</legend>
+      <div class="grid">
+        <label class="fld"><span>Nom de l'artiste</span><input id="art-nom" type="text"></label>
+        <label class="fld"><span>Droit de suite — artiste éligible</span>
+          <select id="art-dds"><option value="oui">Oui (vivant ou décédé ≤ 70 ans)</option><option value="non">Non (décédé depuis + de 70 ans)</option><option value="">—</option></select></label>
+        <label class="fld"><span>Taxe forfaitaire (défaut)</span>
+          <select id="art-tf"><option value="">— (selon la vente)</option><option value="non">Non applicable</option><option value="oui">Applicable</option></select></label>
+        <label class="fld"><span>Type d'objet (taxe forf.)</span>
+          <select id="art-typeObjet"><option value="art">Objet d'art (6,5%)</option><option value="metaux">Métaux précieux (11,5%)</option></select></label>
+        <label class="fld"><span>Note</span><input id="art-note" type="text"></label>
+      </div>
+      <button type="button" class="btn small" id="btn-art-add">Enregistrer l'artiste</button>
+    </fieldset>
+    <div class="disclaimer">Le droit de suite reste subordonné aux autres conditions (œuvre originale, revente, prix ≥ 750 €…) ; le référentiel ne pré-renseigne que le statut de l'artiste. La taxe forfaitaire dépend avant tout de la qualité du vendeur (particulier) : le défaut par artiste n'est qu'une commodité, à valider par vente.</div>
   </div>
 </section>
 

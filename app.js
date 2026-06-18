@@ -9,13 +9,57 @@
   const STORE_KEY = "outil_tva_galerie_v1";
 
   /* ---------- État ---------- */
-  let state = { ventes: [], compta: {}, balanceBG: {} };
+  let state = { ventes: [], compta: {}, balanceBG: {}, artistes: {} };
 
   function load() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
-      if (raw) state = Object.assign({ ventes: [], compta: {}, balanceBG: {} }, JSON.parse(raw));
+      if (raw) state = Object.assign({ ventes: [], compta: {}, balanceBG: {}, artistes: {} }, JSON.parse(raw));
     } catch (e) { console.warn("Lecture stockage:", e); }
+  }
+
+  /* ---------- Référentiel artistes ----------
+   * Principaux artistes connus de la galerie : tous vivants ou décédés depuis
+   * ≤ 70 ans → éligibles au droit de suite. (Modifiable dans l'onglet Artistes.) */
+  const ARTISTES_CONNUS = {
+    "François-Xavier Lalanne": { dds: "oui", note: "décédé 2008 (≤ 70 ans)" },
+    "Claude Lalanne": { dds: "oui", note: "décédée 2019" },
+    "Les Lalanne": { dds: "oui", note: "≤ 70 ans" },
+    "Niki de Saint Phalle": { dds: "oui", note: "décédée 2002" },
+    "Robert Morris": { dds: "oui", note: "décédé 2018" },
+    "Fred Sandback": { dds: "oui", note: "décédé 2003" },
+    "Donald Judd Furniture": { dds: "oui", note: "Donald Judd, décédé 1994" },
+    "Ron Gorchov": { dds: "oui", note: "décédé 2020" },
+    "Roberto Matta": { dds: "oui", note: "décédé 2002" }
+  };
+
+  // Applique le référentiel artiste à une vente (sans modifier l'enregistrement).
+  function appliquerReferentiel(v) {
+    const ref = state.artistes[(v.artiste || "").trim()];
+    if (!ref) return v;
+    const vc = Object.assign({}, v, { ds: Object.assign({}, v.ds), tf: Object.assign({}, v.tf) });
+    if (vc.ds.artisteVivantOuMoins70 == null && ref.dds) vc.ds.artisteVivantOuMoins70 = (ref.dds === "oui");
+    if (!vc.ds.applicabiliteManuelle && ref.dds === "non") vc.ds.applicabiliteManuelle = "non";
+    if (!vc.tf.applicabiliteManuelle && ref.tf) vc.tf.applicabiliteManuelle = ref.tf;
+    if (!vc.tf.typeObjet && ref.typeObjet) vc.tf.typeObjet = ref.typeObjet;
+    return vc;
+  }
+
+  // Recense les artistes présents dans les ventes et crée les entrées manquantes.
+  function recenserArtistes() {
+    let ajouts = 0;
+    state.ventes.forEach(v => {
+      const nom = (v.artiste || "").trim();
+      if (!nom || state.artistes[nom]) return;
+      const connu = ARTISTES_CONNUS[nom] || {};
+      state.artistes[nom] = {
+        dds: connu.dds || "oui",
+        tf: "", typeObjet: "art",
+        note: connu.note || "par défaut — à confirmer"
+      };
+      ajouts++;
+    });
+    return ajouts;
   }
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { console.warn(e); }
@@ -42,7 +86,8 @@
   const oui = (v) => v === "oui" ? true : v === "non" ? false : null;
 
   /* ---------- Calcul enrichi d'une vente ---------- */
-  function evaluer(v) {
+  function evaluer(v0) {
+    const v = appliquerReferentiel(v0);
     const tva = R.calculerTVA(v);
     const ds = R.calculerDroitDeSuite(v);
     const tf = R.calculerTaxeForfaitaire(v);
@@ -526,11 +571,54 @@
   function setBadge(id, n) { const b = $(id); if (!b) return; b.textContent = n; b.classList.toggle("zero", !n); }
 
   /* =================================================================
+   *  RÉFÉRENTIEL ARTISTES (rendu)
+   * ================================================================= */
+  function renderArtistes() {
+    // Stats par artiste (à partir des ventes)
+    const stat = {};
+    state.ventes.forEach(v => {
+      const nom = (v.artiste || "").trim(); if (!nom) return;
+      stat[nom] = stat[nom] || { n: 0, ca: 0 };
+      stat[nom].n++; stat[nom].ca += R.num(v.venteTTC);
+    });
+    const noms = Object.keys(state.artistes).sort((a, b) => (stat[b] ? stat[b].ca : 0) - (stat[a] ? stat[a].ca : 0));
+    if (!noms.length) { $("artistes-table").innerHTML = '<div class="empty">Aucun artiste. Cliquez sur « Recenser les artistes de l\'historique ».</div>'; return; }
+    let h = '<div class="table-wrap"><table><thead><tr><th>Artiste</th><th class="num">Ventes</th><th class="num">CA TTC</th>' +
+      '<th>Droit de suite éligible</th><th>Taxe forf. (défaut)</th><th>Type objet</th><th>Note</th><th></th></tr></thead><tbody>';
+    noms.forEach(nom => {
+      const a = state.artistes[nom], s = stat[nom] || { n: 0, ca: 0 };
+      h += '<tr><td>' + esc(nom) + '</td><td class="num">' + s.n + '</td><td class="num">' + fmt0(s.ca) + '</td>' +
+        '<td>' + selArt(nom, "dds", a.dds, [["oui", "Oui"], ["non", "Non (+70 ans)"], ["", "—"]]) + '</td>' +
+        '<td>' + selArt(nom, "tf", a.tf, [["", "—"], ["non", "Non applicable"], ["oui", "Applicable"]]) + '</td>' +
+        '<td>' + selArt(nom, "typeObjet", a.typeObjet || "art", [["art", "Objet d'art"], ["metaux", "Métaux précieux"]]) + '</td>' +
+        '<td><input data-art="' + esc(nom) + '" data-champ="note" value="' + esc(a.note || "") + '" style="min-width:160px"></td>' +
+        '<td><button class="btn small danger" data-artdel="' + esc(nom) + '">×</button></td></tr>';
+    });
+    h += '</tbody></table></div>';
+    $("artistes-table").innerHTML = h;
+    $("artistes-table").querySelectorAll("[data-art]").forEach(elm => {
+      elm.onchange = () => {
+        const nom = elm.getAttribute("data-art"), champ = elm.getAttribute("data-champ");
+        if (state.artistes[nom]) { state.artistes[nom][champ] = elm.value; save(); refreshAll(); }
+      };
+    });
+    $("artistes-table").querySelectorAll("[data-artdel]").forEach(b => b.onclick = () => {
+      const nom = b.getAttribute("data-artdel");
+      if (confirm("Retirer « " + nom + " » du référentiel ?")) { delete state.artistes[nom]; save(); refreshAll(); }
+    });
+  }
+  function selArt(nom, champ, val, opts) {
+    let s = '<select data-art="' + esc(nom) + '" data-champ="' + champ + '">';
+    opts.forEach(o => s += '<option value="' + o[0] + '"' + (o[0] === (val || "") ? " selected" : "") + '>' + esc(o[1]) + '</option>');
+    return s + '</select>';
+  }
+
+  /* =================================================================
    *  RAFRAÎCHISSEMENT GLOBAL
    * ================================================================= */
   function refreshAll() {
     setBadge("badge-ventes", state.ventes.length);
-    renderVentes(); renderTVA(); renderDS(); renderTF(); renderCadrage(); renderControles(); renderDashboard();
+    renderVentes(); renderTVA(); renderDS(); renderTF(); renderCadrage(); renderControles(); renderDashboard(); renderArtistes();
   }
 
   /* =================================================================
@@ -576,12 +664,13 @@
         if (file.name.endsWith(".json")) {
           const data = JSON.parse(reader.result);
           if (Array.isArray(data)) state.ventes = data;
-          else { state.ventes = data.ventes || []; state.compta = data.compta || {}; state.balanceBG = data.balanceBG || {}; }
+          else { state.ventes = data.ventes || []; state.compta = data.compta || {}; state.balanceBG = data.balanceBG || {}; state.artistes = data.artistes || {}; }
         } else {
           importerCSV(reader.result);
         }
         // garantir un id
         state.ventes.forEach((v, i) => { if (!v.id) v.id = "v" + Date.now() + i; });
+        if (!Object.keys(state.artistes).length) recenserArtistes();
         save(); refreshAll(); switchView("ventes");
         alert(state.ventes.length + " vente(s) importée(s).");
       } catch (e) { alert("Import impossible : " + e.message); }
@@ -718,6 +807,13 @@
     $("file-input").onchange = (e) => { if (e.target.files[0]) importerFichier(e.target.files[0]); e.target.value = ""; };
     $("db-from").onchange = renderDashboard; $("db-to").onchange = renderDashboard;
     $("db-reset-period").onclick = () => { $("db-from").value = ""; $("db-to").value = ""; renderDashboard(); };
+    $("btn-recenser").onclick = () => { const n = recenserArtistes(); save(); refreshAll(); alert(n + " artiste(s) ajouté(s) au référentiel."); };
+    $("btn-art-add").onclick = () => {
+      const nom = $("art-nom").value.trim();
+      if (!nom) { alert("Indiquez le nom de l'artiste."); return; }
+      state.artistes[nom] = { dds: $("art-dds").value, tf: $("art-tf").value, typeObjet: $("art-typeObjet").value, note: $("art-note").value };
+      save(); refreshAll(); $("art-nom").value = ""; $("art-note").value = "";
+    };
   }
 
   /* ---------- Chargement initial de l'historique embarqué ----------
@@ -732,7 +828,12 @@
       state.ventes = seed.ventes;
       state.compta = seed.compta || {};
       state.balanceBG = seed.balanceBG || {};
+      state.artistes = seed.artistes || {};
       save();
+    }
+    // Référentiel artistes : recensement initial si vide.
+    if (state.ventes.length && !Object.keys(state.artistes).length) {
+      recenserArtistes(); save();
     }
   }
 
