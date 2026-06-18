@@ -53,8 +53,9 @@ Fichiers :
 
 | Onglet | Rôle |
 |---|---|
-| **0 · Tableau de bord** | CA, marge, taux de marge, top ventes, top taux de marge, top artistes, répartition par régime. Filtrable par période. |
-| **1 · Saisie guidée** | Questionnaire qui détermine automatiquement le régime, le droit de suite et la taxe forfaitaire, et signale les points à vérifier. |
+| **⚡ Simulateur** | Écran principal, pensé « stand de foire » : saisir le coût + la marge nette visée → l'outil donne le **prix à annoncer** et la **marge optimisée** pour chaque profil d'acheteur (particulier/pro × France/UE/hors UE), en choisissant automatiquement le régime de TVA le plus avantageux (arbitrage marge 20% / droit commun 5,5%, exonérations export & intracom). |
+| **Tableau de bord** | CA, marge, taux de marge, top ventes, top taux de marge, top artistes, répartition par régime. Filtrable par période. |
+| **Saisie détaillée** | Questionnaire complet qui détermine le régime, le droit de suite et la taxe forfaitaire, et signale les points à vérifier (pour enregistrer une vente). |
 | **2 · Ventes** | Tableau de toutes les ventes avec régime, marge, TVA, droit de suite, taxe forfaitaire et indicateur d'alerte. |
 | **3 · Récap TVA (CA3)** | Ventilation par régime et par ligne de la CA3 (04 export, 06 intracom, 08 / 09, 05 non imposable). |
 | **4 · Droit de suite** | Œuvres concernées + barème dégressif (plafond 12 500 €). |

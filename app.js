@@ -589,6 +589,49 @@
   function setBadge(id, n) { const b = $(id); if (!b) return; b.textContent = n; b.classList.toggle("zero", !n); }
 
   /* =================================================================
+   *  SIMULATEUR FOIRE
+   * ================================================================= */
+  function renderSimulateur() {
+    const cout = R.num($("sim-cout").value);
+    if (!cout) { $("sim-result").innerHTML = '<div class="empty">Saisissez le coût de l\'œuvre pour lancer la simulation.</div>'; return; }
+    const params = {
+      cout: cout,
+      margeValeur: $("sim-marge").value,
+      margeUnite: $("sim-marge-unite").value,
+      margeEligible: $("sim-eligible").checked,
+      droitDeSuite: $("sim-ds").checked,
+      commissionPct: $("sim-commission").value
+    };
+    const res = R.simulerPrix(params);
+    const margeEur = R.r2(params.margeUnite === "pct" ? (R.num(params.margeValeur) / 100) * cout : R.num(params.margeValeur));
+    const minPrix = Math.min.apply(null, res.map(r => r.prixAnnonce));
+
+    let h = '<div class="kpi-row">' +
+      kpi(fmt0(cout) + " €", "Coût d'acquisition") +
+      kpi(fmt0(margeEur) + " €", "Marge nette visée") +
+      kpi(pct(cout ? margeEur / cout : 0), "soit, sur le coût") + '</div>';
+
+    h += '<div class="table-wrap"><table><thead><tr>' +
+      '<th>Profil d\'acheteur</th><th>Régime retenu</th><th class="num">Prix à annoncer</th>' +
+      '<th class="num">dont TVA</th><th class="num">Droit de suite</th><th class="num">Marge nette</th></tr></thead><tbody>';
+    res.forEach(r => {
+      const best = Math.abs(r.prixAnnonce - minPrix) < 0.5;
+      h += '<tr' + (best ? ' style="background:#e7f4e8"' : '') + '>' +
+        '<td><b>' + esc(r.label) + '</b></td>' +
+        '<td><span class="tag ' + r.regimeCode + '">' + esc(r.regime) + '</span>' +
+        (r.alternative ? '<br><small style="color:var(--muted)">sinon ' + esc(r.alternative.regime) + ' : ' + fmt0(r.alternative.prixTTC) + ' € TTC</small>' : '') + '</td>' +
+        '<td class="num"><b style="font-size:15px">' + fmt0(r.prixAnnonce) + ' €</b> <small>' + r.baseAnnonce + '</small>' +
+        (r.baseAnnonce === "HT" && r.tva > 0 ? '<br><small style="color:var(--muted)">soit ' + fmt0(r.prixTTC) + ' € TTC</small>' : '') + '</td>' +
+        '<td class="num">' + (r.tva > 0 ? fmt0(r.tva) : "—") + '</td>' +
+        '<td class="num">' + (r.ds > 0 ? fmt0(r.ds) : "—") + '</td>' +
+        '<td class="num">' + fmt0(r.margeNette) + ' €</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<div class="alert info" style="margin-top:10px">💡 Le prix le plus compétitif (surligné) correspond à un acheteur <b>hors UE</b> ou <b>professionnel UE</b> : exonérés de TVA, vous proposez un prix plus bas <b>à marge nette égale</b> — ou vous gagnez davantage au même prix.</div>';
+    $("sim-result").innerHTML = h;
+  }
+
+  /* =================================================================
    *  RÉFÉRENTIEL ARTISTES (rendu)
    * ================================================================= */
   function renderArtistes() {
@@ -643,7 +686,7 @@
    * ================================================================= */
   function refreshAll() {
     setBadge("badge-ventes", state.ventes.length);
-    renderVentes(); renderTVA(); renderDS(); renderTF(); renderCadrage(); renderControles(); renderDashboard(); renderArtistes();
+    renderSimulateur(); renderVentes(); renderTVA(); renderDS(); renderTF(); renderCadrage(); renderControles(); renderDashboard(); renderArtistes();
   }
 
   /* =================================================================
@@ -832,6 +875,9 @@
     $("file-input").onchange = (e) => { if (e.target.files[0]) importerFichier(e.target.files[0]); e.target.value = ""; };
     $("db-from").onchange = renderDashboard; $("db-to").onchange = renderDashboard;
     $("db-reset-period").onclick = () => { $("db-from").value = ""; $("db-to").value = ""; renderDashboard(); };
+    ["sim-cout", "sim-marge", "sim-marge-unite", "sim-eligible", "sim-ds", "sim-commission"].forEach(id => {
+      const e = $(id); if (e) { e.addEventListener("input", renderSimulateur); e.addEventListener("change", renderSimulateur); }
+    });
     $("btn-recenser").onclick = () => { const n = recenserArtistes(); save(); refreshAll(); alert(n + " artiste(s) ajouté(s) au référentiel."); };
     $("btn-art-add").onclick = () => {
       const nom = $("art-nom").value.trim();
