@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outil TVA — Galerie d'art</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="app">
+  <div>
+    <h1>Outil TVA — Galerie d'art</h1>
+    <div class="sub">Régime export / intracom / 5,5% / marge · Droit de suite · Taxe forfaitaire · Cadrage compta — réglementation en vigueur 2025</div>
+  </div>
+  <div class="tools">
+    <button class="btn ghost" id="btn-import">Importer (JSON/CSV)</button>
+    <button class="btn ghost" id="btn-export-json">Exporter JSON</button>
+    <button class="btn ghost" id="btn-export-csv">Exporter CSV</button>
+    <button class="btn ghost" id="btn-print">Imprimer</button>
+    <input type="file" id="file-input" accept=".json,.csv" hidden>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-view="dashboard" class="active">0 · Tableau de bord</button>
+  <button data-view="saisie">1 · Saisie guidée</button>
+  <button data-view="ventes">2 · Ventes <span class="badge zero" id="badge-ventes">0</span></button>
+  <button data-view="tva">3 · Récap TVA (CA3)</button>
+  <button data-view="ds">4 · Droit de suite</button>
+  <button data-view="tf">5 · Taxe forfaitaire</button>
+  <button data-view="cadrage">6 · Cadrage compta</button>
+  <button data-view="controles">7 · Contrôles <span class="badge zero" id="badge-controles">0</span></button>
+</nav>
+
+<main>
+
+<!-- ============ 0. TABLEAU DE BORD ============ -->
+<section class="view active" id="view-dashboard">
+  <div class="panel">
+    <h2>Tableau de bord</h2>
+    <p class="lead">Vue d'ensemble de l'activité : chiffre d'affaires, marge, et classements. Filtrable par période.</p>
+    <div class="toolbar">
+      <label class="fld" style="margin:0"><span>Du</span><input id="db-from" type="date"></label>
+      <label class="fld" style="margin:0"><span>Au</span><input id="db-to" type="date"></label>
+      <button class="btn secondary small" id="db-reset-period">Toute la période</button>
+    </div>
+    <div id="db-kpi" class="kpi-row"></div>
+  </div>
+  <div class="grid wide">
+    <div class="panel"><h3>Top 10 — plus grosses ventes</h3><div id="db-top-ventes"></div></div>
+    <div class="panel"><h3>Top 10 — plus gros taux de marge</h3><div id="db-top-taux"></div></div>
+    <div class="panel"><h3>Top artistes (CA &amp; marge)</h3><div id="db-top-artistes"></div></div>
+    <div class="panel"><h3>Répartition du CA par régime de TVA</h3><div id="db-repartition"></div></div>
+  </div>
+</section>
+
+<!-- ============ 1. SAISIE GUIDÉE ============ -->
+<section class="view" id="view-saisie">
+  <div class="panel">
+    <h2>Saisie guidée d'une vente</h2>
+    <p class="lead">Répondez aux questions : l'outil détermine automatiquement le régime de TVA applicable, le droit de suite et la taxe forfaitaire éventuels, et signale les points à vérifier.</p>
+
+    <form id="form-vente">
+      <input type="hidden" id="f-id">
+
+      <fieldset>
+        <legend>Identification</legend>
+        <div class="grid">
+          <label class="fld"><span>N° de ligne (compta)</span><input id="f-ligneCompta" type="text" placeholder="ex. 1"></label>
+          <label class="fld"><span>N° de facture</span><input id="f-numFacture" type="text" placeholder="ex. 2506059"></label>
+          <label class="fld"><span>Date de facture</span><input id="f-dateFacture" type="date"></label>
+          <label class="fld"><span>Artiste</span><input id="f-artiste" type="text"></label>
+          <label class="fld"><span>Œuvre</span><input id="f-oeuvre" type="text"></label>
+          <label class="fld"><span>Référence</span><input id="f-refSiam" type="text"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Nature du bien vendu</legend>
+        <div class="q-box"><span class="q">Que vendez-vous exactement ?</span> Le taux réduit de 5,5% est réservé aux œuvres d'art, objets de collection et d'antiquité (réforme 1/1/2025).</div>
+        <div class="grid">
+          <label class="fld"><span>Nature du bien</span><select id="f-natureBien"></select></label>
+          <label class="fld"><span>Œuvre originale ?</span>
+            <select id="f-oeuvreOriginale"><option value="">—</option><option value="oui">Oui</option><option value="non">Non</option></select></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Montants</legend>
+        <div class="grid">
+          <label class="fld"><span>Prix de vente TTC (€)</span><input id="f-venteTTC" type="number" step="0.01"></label>
+          <label class="fld"><span>Prix d'achat TTC (€) <small>(pour la marge)</small></span><input id="f-achatTTC" type="number" step="0.01"></label>
+          <label class="fld"><span>Frais accessoires HT (€)</span><input id="f-fraisAccessoiresHT" type="number" step="0.01"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Acquisition de l'œuvre par la galerie</legend>
+        <div class="q-box"><span class="q">Comment la galerie a-t-elle acquis l'œuvre ?</span> C'est ce qui détermine si le régime de la marge est possible (interdit si achat au taux réduit depuis 2025).</div>
+        <label class="fld"><span>Mode d'acquisition</span><select id="f-modeAcquisition"></select></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Client &amp; destination</legend>
+        <div class="grid">
+          <label class="fld"><span>Client</span><input id="f-client" type="text"></label>
+          <label class="fld"><span>Pays</span><input id="f-pays" type="text"></label>
+          <label class="fld"><span>Zone</span><select id="f-zone"></select></label>
+          <label class="fld"><span>Type de client</span><select id="f-typeClient"></select></label>
+          <label class="fld"><span>N° TVA intracom (UE pro)</span><input id="f-numTvaIntra" type="text"></label>
+        </div>
+        <div class="grid">
+          <label class="fld"><span>Justificatif d'export (hors UE) ?</span>
+            <select id="f-justificatifExport"><option value="">—</option><option value="oui">Oui</option><option value="non">Non</option></select></label>
+          <label class="fld"><span>Preuve transport hors France (intracom) ?</span>
+            <select id="f-transportHorsFR"><option value="">—</option><option value="oui">Oui</option><option value="non">Non</option></select></label>
+          <label class="fld"><span>Option droit commun 5,5% (art. 297 C) ?</span>
+            <select id="f-optionDroitCommun"><option value="">—</option><option value="oui">Oui (renoncer à la marge)</option><option value="non">Non</option></select></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Régime saisi par l'utilisateur (facultatif — pour contrôle)</legend>
+        <div class="hint">Si vous indiquez le régime que vous comptiez appliquer, l'outil le confronte à sa propre détermination et vous alerte en cas de divergence.</div>
+        <label class="fld"><span>Régime envisagé</span>
+          <select id="f-regimeChoisi">
+            <option value="">— (laisser l'outil décider)</option>
+            <option value="EXPORT">Exportation exonérée</option>
+            <option value="INTRACOM">Livraison intracom exonérée</option>
+            <option value="DC_55">Droit commun 5,5%</option>
+            <option value="DC_20">Droit commun 20%</option>
+            <option value="MARGE">Régime de la marge</option>
+            <option value="MARGE_FORFAITAIRE">Marge forfaitaire 30% (ancien régime)</option>
+          </select></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Droit de suite</legend>
+        <div class="grid">
+          <label class="fld"><span>1ère cession par l'artiste ?</span>
+            <select id="f-ds-premiereCession"><option value="">—</option><option value="non">Non (revente)</option><option value="oui">Oui (1ère vente)</option></select></label>
+          <label class="fld"><span>Artiste vivant ou décédé ≤ 70 ans ?</span>
+            <select id="f-ds-artisteVivantOuMoins70"><option value="">—</option><option value="oui">Oui</option><option value="non">Non (+ 70 ans)</option></select></label>
+          <label class="fld"><span>Vente soumise / établie en France ?</span>
+            <select id="f-ds-venteSoumiseFrance"><option value="">—</option><option value="oui">Oui</option><option value="non">Non</option></select></label>
+          <label class="fld"><span>Acquise directement de l'artiste &lt; 3 ans ?</span>
+            <select id="f-ds-acquiseDirecteArtisteMoins3ans"><option value="">—</option><option value="non">Non</option><option value="oui">Oui</option></select></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Taxe forfaitaire sur les objets précieux</legend>
+        <div class="q-box"><span class="q">Le vendeur (cédant) est-il un particulier ?</span> La taxe forfaitaire ne concerne que les cessions par des particuliers ; la galerie intermédiaire en France la verse pour leur compte.</div>
+        <div class="grid">
+          <label class="fld"><span>Vendeur particulier ?</span>
+            <select id="f-tf-vendeurParticulier"><option value="">—</option><option value="non">Non</option><option value="oui">Oui</option></select></label>
+          <label class="fld"><span>Type d'objet</span>
+            <select id="f-tf-typeObjet"><option value="art">Objet d'art / collection / antiquité (6%)</option><option value="metaux">Métaux précieux (11%)</option></select></label>
+          <label class="fld"><span>Vendeur domicilié en France ?</span>
+            <select id="f-tf-vendeurDomicilieFR"><option value="oui">Oui (+0,5% CRDS)</option><option value="non">Non</option></select></label>
+          <label class="fld"><span>Option régime plus-values réelles ?</span>
+            <select id="f-tf-optionPlusValue"><option value="">—</option><option value="non">Non</option><option value="oui">Oui</option></select></label>
+          <label class="fld"><span>Prix de cession (si ≠ prix de vente)</span><input id="f-tf-prixCession" type="number" step="0.01"></label>
+        </div>
+      </fieldset>
+
+      <label class="fld"><span>Commentaire</span><textarea id="f-commentaire" rows="2"></textarea></label>
+
+      <div class="toolbar">
+        <button type="button" class="btn" id="btn-evaluer">Évaluer en direct</button>
+        <button type="submit" class="btn">Enregistrer la vente</button>
+        <button type="button" class="btn secondary" id="btn-reset">Nouvelle saisie</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel" id="live-result" style="display:none">
+    <h2>Résultat de l'analyse</h2>
+    <div id="live-result-body"></div>
+  </div>
+</section>
+
+<!-- ============ 2. VENTES ============ -->
+<section class="view" id="view-ventes">
+  <div class="panel">
+    <div class="toolbar">
+      <h2 style="margin:0">Ventes enregistrées</h2>
+      <div class="spacer"></div>
+      <button class="btn secondary small" id="btn-demo">Charger un jeu d'exemple</button>
+      <button class="btn danger small" id="btn-clear">Tout effacer</button>
+    </div>
+    <div id="ventes-table"></div>
+  </div>
+</section>
+
+<!-- ============ 3. RÉCAP TVA ============ -->
+<section class="view" id="view-tva">
+  <div class="panel">
+    <h2>Récapitulatif TVA collectée — préparation CA3</h2>
+    <p class="lead">Ventilation par régime et par ligne de la déclaration. À reporter sur la CA3.</p>
+    <div id="kpi-tva" class="kpi-row"></div>
+    <div id="tva-table"></div>
+  </div>
+</section>
+
+<!-- ============ 4. DROIT DE SUITE ============ -->
+<section class="view" id="view-ds">
+  <div class="panel">
+    <h2>Droit de suite</h2>
+    <p class="lead">Œuvres pour lesquelles le droit de suite est dû, avec barème dégressif (plafond 12 500 €).</p>
+    <div id="ds-table"></div>
+    <details class="ref"><summary>Rappel des conditions et du barème</summary>
+      <p>Œuvre originale graphique/plastique, revente avec intervention d'un professionnel, prix ≥ 750 € HT, artiste vivant ou décédé ≤ 70 ans.
+      Barème : 4% ≤ 50 000 ; 3% jusqu'à 200 000 ; 1% jusqu'à 350 000 ; 0,5% jusqu'à 500 000 ; 0,25% au-delà — plafond 12 500 €.
+      Exonération du revendeur si œuvre acquise directement de l'artiste &lt; 3 ans et prix &lt; 10 000 €.</p>
+    </details>
+  </div>
+</section>
+
+<!-- ============ 5. TAXE FORFAITAIRE ============ -->
+<section class="view" id="view-tf">
+  <div class="panel">
+    <h2>Taxe forfaitaire sur les objets précieux</h2>
+    <p class="lead">Cessions par des particuliers (art. 150 VI s. CGI). La galerie, intermédiaire en France, déclare et verse pour leur compte.</p>
+    <div id="tf-table"></div>
+    <details class="ref"><summary>Rappel</summary>
+      <p>Taux : 6% (objets d'art/collection/antiquité/bijoux) ou 11% (métaux précieux), + 0,5% CRDS si vendeur domicilié en France.
+      Exonérée si prix de cession ≤ 5 000 €. Assiette = prix de cession (commission non déductible). Option possible pour le régime réel des plus-values.</p>
+    </details>
+  </div>
+</section>
+
+<!-- ============ 6. CADRAGE COMPTA ============ -->
+<section class="view" id="view-cadrage">
+  <div class="panel">
+    <h2>Cadrage avec la comptabilité</h2>
+    <p class="lead">Pour chaque compte produit, comparez le CA HT attendu (calculé par l'outil) au solde comptable. Saisissez les soldes compta : les écarts s'affichent automatiquement.</p>
+    <div id="cadrage-table"></div>
+  </div>
+</section>
+
+<!-- ============ 7. CONTRÔLES ============ -->
+<section class="view" id="view-controles">
+  <div class="panel">
+    <h2>Contrôles &amp; questions d'orientation</h2>
+    <p class="lead">Points à vérifier détectés sur l'ensemble des ventes. Traitez en priorité les alertes rouges (erreurs probables).</p>
+    <div id="controles-body"></div>
+    <div class="disclaimer">
+      Outil d'aide à la décision conçu pour le suivi d'une galerie d'art — réglementation en vigueur au 1er janvier 2025
+      (CGI art. 278-0 bis, 297 A, 297 C ; droit de suite ; art. 150 VI et s.). Ne se substitue pas à l'analyse du conseil.
+      Vérifiez les paramètres dans <code>regles.js</code> à chaque loi de finances.
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script src="regles.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
