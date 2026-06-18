@@ -54,7 +54,7 @@ Fichiers :
 | **5 · Taxe forfaitaire** | Cessions par des particuliers (art. 150 VI s.). |
 | **6 · Cadrage compta** | Cadrage avec la Balance Générale en 3 volets : **A.** CA par compte (classe 70), **B.** TVA collectée (44571*), **C.** achats & coûts (classe 6 : achats d'œuvres, frais, commissions, droit de suite, taxe forfaitaire). Écarts BG − outil automatiques. |
 | **7 · Contrôles** | Toutes les questions d'orientation et alertes consolidées (rouge = erreur probable). |
-| **8 · Artistes** | Référentiel des artistes : statut droit de suite (vivant ou décédé ≤ 70 ans) et défaut taxe forfaitaire, renseignés une fois et propagés automatiquement à toutes les ventes de l'artiste. |
+| **8 · Artistes** | Référentiel des artistes : année de décès (calcule l'éligibilité au droit de suite : vivant ou décédé ≤ 70 ans), organisme de reversement (ADAGP / ayants droit), défaut taxe forfaitaire. Renseigné une fois et propagé automatiquement à toutes les ventes de l'artiste ; l'organisme apparaît dans l'onglet Droit de suite. |
 
 ## Importer l'historique depuis l'ancien Excel
 

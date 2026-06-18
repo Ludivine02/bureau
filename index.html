@@ -267,8 +267,11 @@
       <legend>Ajouter / mettre à jour un artiste</legend>
       <div class="grid">
         <label class="fld"><span>Nom de l'artiste</span><input id="art-nom" type="text"></label>
+        <label class="fld"><span>Année de décès <small>(vide = vivant)</small></span><input id="art-deces" type="number" placeholder="ex. 2008"></label>
         <label class="fld"><span>Droit de suite — artiste éligible</span>
           <select id="art-dds"><option value="oui">Oui (vivant ou décédé ≤ 70 ans)</option><option value="non">Non (décédé depuis + de 70 ans)</option><option value="">—</option></select></label>
+        <label class="fld"><span>Organisme (reversement droit de suite)</span>
+          <select id="art-organisme"><option value="ADAGP">ADAGP</option><option value="Ayants droit">Ayants droit</option><option value="Autre">Autre</option><option value="">—</option></select></label>
         <label class="fld"><span>Taxe forfaitaire (défaut)</span>
           <select id="art-tf"><option value="">— (selon la vente)</option><option value="non">Non applicable</option><option value="oui">Applicable</option></select></label>
         <label class="fld"><span>Type d'objet (taxe forf.)</span>

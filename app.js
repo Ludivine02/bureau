@@ -22,16 +22,23 @@
    * Principaux artistes connus de la galerie : tous vivants ou décédés depuis
    * ≤ 70 ans → éligibles au droit de suite. (Modifiable dans l'onglet Artistes.) */
   const ARTISTES_CONNUS = {
-    "François-Xavier Lalanne": { dds: "oui", note: "décédé 2008 (≤ 70 ans)" },
-    "Claude Lalanne": { dds: "oui", note: "décédée 2019" },
-    "Les Lalanne": { dds: "oui", note: "≤ 70 ans" },
-    "Niki de Saint Phalle": { dds: "oui", note: "décédée 2002" },
-    "Robert Morris": { dds: "oui", note: "décédé 2018" },
-    "Fred Sandback": { dds: "oui", note: "décédé 2003" },
-    "Donald Judd Furniture": { dds: "oui", note: "Donald Judd, décédé 1994" },
-    "Ron Gorchov": { dds: "oui", note: "décédé 2020" },
-    "Roberto Matta": { dds: "oui", note: "décédé 2002" }
+    "François-Xavier Lalanne": { deces: "2008", note: "décédé 2008" },
+    "Claude Lalanne": { deces: "2019", note: "décédée 2019" },
+    "Les Lalanne": { note: "≤ 70 ans" },
+    "Niki de Saint Phalle": { deces: "2002", note: "décédée 2002" },
+    "Robert Morris": { deces: "2018", note: "décédé 2018" },
+    "Fred Sandback": { deces: "2003", note: "décédé 2003" },
+    "Donald Judd Furniture": { deces: "1994", note: "Donald Judd, décédé 1994" },
+    "Ron Gorchov": { deces: "2020", note: "décédé 2020" },
+    "Roberto Matta": { deces: "2002", note: "décédé 2002" }
   };
+
+  // Éligibilité droit de suite déduite de l'année de décès (vivant ou décédé ≤ 70 ans).
+  function ddsDepuisDeces(deces) {
+    const an = parseInt(deces, 10);
+    if (!an) return "oui"; // vivant / inconnu
+    return (R.PARAMS.exerciceCourant - an) <= 70 ? "oui" : "non";
+  }
 
   // Applique le référentiel artiste à une vente (sans modifier l'enregistrement).
   function appliquerReferentiel(v) {
@@ -53,7 +60,9 @@
       if (!nom || state.artistes[nom]) return;
       const connu = ARTISTES_CONNUS[nom] || {};
       state.artistes[nom] = {
-        dds: connu.dds || "oui",
+        deces: connu.deces || "",
+        dds: ddsDepuisDeces(connu.deces),
+        organisme: "ADAGP",
         tf: "", typeObjet: "art",
         note: connu.note || "par défaut — à confirmer"
       };
@@ -342,17 +351,19 @@
    * ================================================================= */
   function renderDS() {
     let h = '<div class="table-wrap"><table><thead><tr><th>Facture</th><th>Artiste</th><th>Œuvre</th>' +
-      '<th class="num">Prix vente</th><th>Dû ?</th><th class="num">Montant</th><th>Motif</th></tr></thead><tbody>';
+      '<th class="num">Prix vente</th><th>Dû ?</th><th class="num">Montant</th><th>Reverser à</th><th>Motif</th></tr></thead><tbody>';
     let total = 0, n = 0;
     state.ventes.forEach(v => {
-      const ds = R.calculerDroitDeSuite(v);
+      const ds = R.calculerDroitDeSuite(appliquerReferentiel(v));
+      const ref = state.artistes[(v.artiste || "").trim()];
+      const organisme = ds.du ? (ref && ref.organisme ? ref.organisme : "à préciser") : "";
       if (ds.du) { total += ds.montant; n++; }
       h += '<tr><td>' + esc(v.numFacture) + '</td><td>' + esc(v.artiste) + '</td><td>' + esc(v.oeuvre) + '</td>' +
         '<td class="num">' + fmt(R.num(v.venteTTC)) + '</td>' +
         '<td>' + (ds.du ? '<span class="dot ok"></span>Oui' : "Non") + '</td>' +
-        '<td class="num">' + (ds.du ? fmt(ds.montant) : "—") + '</td><td>' + esc(ds.motif) + '</td></tr>';
+        '<td class="num">' + (ds.du ? fmt(ds.montant) : "—") + '</td><td>' + esc(organisme) + '</td><td>' + esc(ds.motif) + '</td></tr>';
     });
-    h += '</tbody><tfoot><tr><td colspan="5">TOTAL droit de suite (' + n + ' œuvre(s))</td><td class="num">' + fmt(total) + '</td><td></td></tr></tfoot></table></div>';
+    h += '</tbody><tfoot><tr><td colspan="5">TOTAL droit de suite (' + n + ' œuvre(s))</td><td class="num">' + fmt(total) + '</td><td colspan="2"></td></tr></tfoot></table></div>';
     if (!state.ventes.length) h = '<div class="empty">Aucune donnée.</div>';
     $("ds-table").innerHTML = h;
   }
@@ -365,7 +376,7 @@
       '<th class="num">Assiette</th><th class="num">Taux</th><th class="num">Montant</th><th>Statut</th></tr></thead><tbody>';
     let total = 0, n = 0;
     state.ventes.forEach(v => {
-      const tf = R.calculerTaxeForfaitaire(v);
+      const tf = R.calculerTaxeForfaitaire(appliquerReferentiel(v));
       if (tf.du) { total += tf.montant; n++; }
       h += '<tr><td>' + esc(v.numFacture) + '</td><td>' + esc(v.client) + '</td><td>' + esc(v.oeuvre) + '</td>' +
         '<td class="num">' + (tf.du ? fmt(tf.assiette) : "—") + '</td>' +
@@ -428,9 +439,10 @@
     /* --- Volet C : achats & coûts (classe 6) --- */
     const som = { achat: 0, frais: 0, commissions: 0, ds: 0, tf: 0 };
     state.ventes.forEach(v => {
+      const vr = appliquerReferentiel(v);
       som.achat += R.num(v.achatTTC); som.frais += R.num(v.fraisAccessoiresHT); som.commissions += R.num(v.commissions);
-      const ds = R.calculerDroitDeSuite(v); if (ds.du) som.ds += ds.montant;
-      const tf = R.calculerTaxeForfaitaire(v); if (tf.du) som.tf += tf.montant;
+      const ds = R.calculerDroitDeSuite(vr); if (ds.du) som.ds += ds.montant;
+      const tf = R.calculerTaxeForfaitaire(vr); if (tf.du) som.tf += tf.montant;
     });
     let hC = '<div class="table-wrap"><table><thead><tr><th>Poste</th><th>Comptes BG</th>' +
       '<th class="num">Outil</th><th class="num">Balance</th><th class="num">Écart BG − outil</th></tr></thead><tbody>';
@@ -584,14 +596,17 @@
     const noms = Object.keys(state.artistes).sort((a, b) => (stat[b] ? stat[b].ca : 0) - (stat[a] ? stat[a].ca : 0));
     if (!noms.length) { $("artistes-table").innerHTML = '<div class="empty">Aucun artiste. Cliquez sur « Recenser les artistes de l\'historique ».</div>'; return; }
     let h = '<div class="table-wrap"><table><thead><tr><th>Artiste</th><th class="num">Ventes</th><th class="num">CA TTC</th>' +
-      '<th>Droit de suite éligible</th><th>Taxe forf. (défaut)</th><th>Type objet</th><th>Note</th><th></th></tr></thead><tbody>';
+      '<th class="num">Décès</th><th>Droit de suite éligible</th><th>Organisme (reversement)</th>' +
+      '<th>Taxe forf. (défaut)</th><th>Type objet</th><th>Note</th><th></th></tr></thead><tbody>';
     noms.forEach(nom => {
       const a = state.artistes[nom], s = stat[nom] || { n: 0, ca: 0 };
       h += '<tr><td>' + esc(nom) + '</td><td class="num">' + s.n + '</td><td class="num">' + fmt0(s.ca) + '</td>' +
+        '<td class="num"><input data-art="' + esc(nom) + '" data-champ="deces" value="' + esc(a.deces || "") + '" placeholder="année" style="max-width:70px;text-align:right"></td>' +
         '<td>' + selArt(nom, "dds", a.dds, [["oui", "Oui"], ["non", "Non (+70 ans)"], ["", "—"]]) + '</td>' +
+        '<td>' + selArt(nom, "organisme", a.organisme || "", [["ADAGP", "ADAGP"], ["Ayants droit", "Ayants droit"], ["Autre", "Autre"], ["", "—"]]) + '</td>' +
         '<td>' + selArt(nom, "tf", a.tf, [["", "—"], ["non", "Non applicable"], ["oui", "Applicable"]]) + '</td>' +
         '<td>' + selArt(nom, "typeObjet", a.typeObjet || "art", [["art", "Objet d'art"], ["metaux", "Métaux précieux"]]) + '</td>' +
-        '<td><input data-art="' + esc(nom) + '" data-champ="note" value="' + esc(a.note || "") + '" style="min-width:160px"></td>' +
+        '<td><input data-art="' + esc(nom) + '" data-champ="note" value="' + esc(a.note || "") + '" style="min-width:140px"></td>' +
         '<td><button class="btn small danger" data-artdel="' + esc(nom) + '">×</button></td></tr>';
     });
     h += '</tbody></table></div>';
@@ -599,7 +614,11 @@
     $("artistes-table").querySelectorAll("[data-art]").forEach(elm => {
       elm.onchange = () => {
         const nom = elm.getAttribute("data-art"), champ = elm.getAttribute("data-champ");
-        if (state.artistes[nom]) { state.artistes[nom][champ] = elm.value; save(); refreshAll(); }
+        if (!state.artistes[nom]) return;
+        state.artistes[nom][champ] = elm.value;
+        // L'année de décès recalcule automatiquement l'éligibilité au droit de suite.
+        if (champ === "deces") state.artistes[nom].dds = ddsDepuisDeces(elm.value);
+        save(); refreshAll();
       };
     });
     $("artistes-table").querySelectorAll("[data-artdel]").forEach(b => b.onclick = () => {
@@ -811,8 +830,13 @@
     $("btn-art-add").onclick = () => {
       const nom = $("art-nom").value.trim();
       if (!nom) { alert("Indiquez le nom de l'artiste."); return; }
-      state.artistes[nom] = { dds: $("art-dds").value, tf: $("art-tf").value, typeObjet: $("art-typeObjet").value, note: $("art-note").value };
-      save(); refreshAll(); $("art-nom").value = ""; $("art-note").value = "";
+      const deces = $("art-deces").value.trim();
+      state.artistes[nom] = {
+        deces: deces, dds: deces ? ddsDepuisDeces(deces) : $("art-dds").value,
+        organisme: $("art-organisme").value, tf: $("art-tf").value,
+        typeObjet: $("art-typeObjet").value, note: $("art-note").value
+      };
+      save(); refreshAll(); $("art-nom").value = ""; $("art-note").value = ""; $("art-deces").value = "";
     };
   }
 
