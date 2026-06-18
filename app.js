@@ -47,11 +47,15 @@
     const ds = R.calculerDroitDeSuite(v);
     const tf = R.calculerTaxeForfaitaire(v);
     const ctrl = R.controlerLigne(v, tva);
-    const venteTTC = R.num(v.venteTTC), achatTTC = R.num(v.achatTTC), frais = R.num(v.fraisAccessoiresHT);
-    const margeBrute = venteTTC - achatTTC - frais;
-    const tauxMarge = venteTTC ? margeBrute / venteTTC : 0;
+    const venteTTC = R.num(v.venteTTC), achatTTC = R.num(v.achatTTC);
+    const frais = R.num(v.fraisAccessoiresHT), commissions = R.num(v.commissions);
+    // Marge économique HT = Ventes HT - achats (stock + achats) - frais accessoires - commissions.
+    // Ventes HT = TTC - TVA collectée (cohérent quel que soit le régime).
+    const venteHT = R.r2(venteTTC - tva.tva);
+    const marge = R.r2(venteHT - achatTTC - frais - commissions);
+    const tauxMarge = venteHT ? marge / venteHT : 0;
     const alertes = [].concat(tva.alertes, ds.alertes, tf.alertes, ctrl);
-    return { tva, ds, tf, alertes, margeBrute, tauxMarge, venteTTC, achatTTC };
+    return { tva, ds, tf, alertes, marge, tauxMarge, venteTTC, venteHT, achatTTC, frais, commissions };
   }
 
   /* =================================================================
@@ -185,7 +189,8 @@
     if (t.partNonImposable) h += '<div><small>Part non imposable (ligne 05)</small><b>' + fmt(t.partNonImposable) + ' €</b></div>';
     h += '<div><small>Ligne CA3</small><b>' + esc(t.ligneCA3) + '</b></div>';
     h += '<div><small>Compte produit</small><b>' + esc(t.compte || "—") + '</b></div>';
-    h += '<div><small>Marge brute / taux</small><b>' + fmt(r.margeBrute) + ' € · ' + pct(r.tauxMarge) + '</b></div>';
+    h += '<div><small>Vente HT</small><b>' + fmt(r.venteHT) + ' €</b></div>';
+    h += '<div><small>Marge HT / taux <span title="Vente HT − achats − frais − commissions">ⓘ</span></small><b>' + fmt(r.marge) + ' € · ' + pct(r.tauxMarge) + '</b></div>';
     h += '</div></div>';
 
     if (r.ds.du) h += '<div class="alert info" style="margin-top:10px"><b>Droit de suite dû : ' + fmt(r.ds.montant) + ' €</b> — ' + esc(r.ds.motif) + '</div>';
@@ -211,7 +216,7 @@
     if (!state.ventes.length) { wrap.innerHTML = '<div class="empty">Aucune vente. Saisissez-en une (onglet 1) ou chargez un jeu d\'exemple.</div>'; return; }
     let h = '<div class="table-wrap"><table><thead><tr>' +
       '<th>Ligne</th><th>Facture</th><th>Date</th><th>Artiste</th><th>Œuvre</th>' +
-      '<th class="num">Vente TTC</th><th class="num">Achat TTC</th><th class="num">Marge</th><th class="num">% marge</th>' +
+      '<th class="num">Vente TTC</th><th class="num">Achat</th><th class="num">Frais</th><th class="num">Comm.</th><th class="num">Marge HT</th><th class="num">% marge</th>' +
       '<th>Régime</th><th class="num">HT (réf. compta)</th><th class="num">TVA (réf. compta)</th>' +
       '<th class="num">Base HT (outil)</th><th class="num">TVA (outil)</th><th class="num">Écart TVA</th><th>DS</th><th>TF</th><th>!</th><th></th></tr></thead><tbody>';
     state.ventes.forEach(v => {
@@ -225,7 +230,8 @@
       h += '<td>' + esc(v.ligneCompta) + '</td><td>' + esc(v.numFacture) + '</td><td>' + esc(v.dateFacture) + '</td>';
       h += '<td>' + esc(v.artiste) + '</td><td>' + esc(v.oeuvre) + '</td>';
       h += '<td class="num">' + fmt(r.venteTTC) + '</td><td class="num">' + fmt(r.achatTTC) + '</td>';
-      h += '<td class="num">' + fmt(r.margeBrute) + '</td><td class="num">' + pct(r.tauxMarge) + '</td>';
+      h += '<td class="num">' + fmt(r.frais) + '</td><td class="num">' + fmt(r.commissions) + '</td>';
+      h += '<td class="num">' + fmt(r.marge) + '</td><td class="num">' + pct(r.tauxMarge) + '</td>';
       h += '<td><span class="tag ' + (r.tva.regime ? r.tva.regime.code : "") + '">' + esc(r.tva.regime ? r.tva.regime.label : "?") + '</span></td>';
       h += '<td class="num">' + (htRef == null ? "—" : fmt(htRef)) + '</td><td class="num">' + (tvaRef == null ? "—" : fmt(tvaRef)) + '</td>';
       h += '<td class="num">' + fmt(r.tva.baseHT) + '</td><td class="num">' + fmt(r.tva.tva) + '</td>';
@@ -445,15 +451,14 @@
     const vs = ventesFiltrees().map(v => ({ v, r: evaluer(v) }));
     let caTTC = 0, caHT = 0, achats = 0, marge = 0, tva = 0;
     vs.forEach(({ v, r }) => {
-      caTTC += r.venteTTC; achats += r.achatTTC; marge += r.margeBrute; tva += r.tva.tva;
-      caHT += r.tva.baseHT + (r.tva.partNonImposable || 0) +
-        (r.tva.regime && (r.tva.regime.code === "EXPORT" || r.tva.regime.code === "INTRACOM") ? r.venteTTC : 0);
+      caTTC += r.venteTTC; achats += r.achatTTC; marge += r.marge; tva += r.tva.tva;
+      caHT += r.venteHT;
     });
-    const tauxMargeGlobal = caTTC ? marge / caTTC : 0;
+    const tauxMargeGlobal = caHT ? marge / caHT : 0;
     $("db-kpi").innerHTML =
       kpi(fmt0(caTTC) + " €", "Chiffre d'affaires (TTC)") +
       kpi(fmt0(caHT) + " €", "CA HT") +
-      kpi(fmt0(marge) + " €", "Marge brute") +
+      kpi(fmt0(marge) + " €", "Marge HT (nette de comm.)") +
       kpi(pct(tauxMargeGlobal), "Taux de marge moyen") +
       kpi(fmt0(tva) + " €", "TVA collectée") +
       kpi(vs.length, "Nombre de ventes");
@@ -461,28 +466,28 @@
     // Top ventes
     const parVente = vs.slice().sort((a, b) => b.r.venteTTC - a.r.venteTTC).slice(0, 10);
     $("db-top-ventes").innerHTML = miniTable(
-      ["Œuvre", "Artiste", "Vente TTC", "Marge", "%"],
-      parVente.map(x => [esc(x.v.oeuvre || x.v.numFacture), esc(x.v.artiste), fmt0(x.r.venteTTC), fmt0(x.r.margeBrute), pct(x.r.tauxMarge)]),
+      ["Œuvre", "Artiste", "Vente TTC", "Marge HT", "%"],
+      parVente.map(x => [esc(x.v.oeuvre || x.v.numFacture), esc(x.v.artiste), fmt0(x.r.venteTTC), fmt0(x.r.marge), pct(x.r.tauxMarge)]),
       [false, false, true, true, true]);
 
     // Top taux de marge (ventes significatives > 0)
-    const parTaux = vs.filter(x => x.r.venteTTC > 0).slice().sort((a, b) => b.r.tauxMarge - a.r.tauxMarge).slice(0, 10);
+    const parTaux = vs.filter(x => x.r.venteHT > 0).slice().sort((a, b) => b.r.tauxMarge - a.r.tauxMarge).slice(0, 10);
     $("db-top-taux").innerHTML = miniTable(
-      ["Œuvre", "Artiste", "% marge", "Vente TTC", "Marge"],
-      parTaux.map(x => [esc(x.v.oeuvre || x.v.numFacture), esc(x.v.artiste), pct(x.r.tauxMarge), fmt0(x.r.venteTTC), fmt0(x.r.margeBrute)]),
+      ["Œuvre", "Artiste", "% marge", "Vente TTC", "Marge HT"],
+      parTaux.map(x => [esc(x.v.oeuvre || x.v.numFacture), esc(x.v.artiste), pct(x.r.tauxMarge), fmt0(x.r.venteTTC), fmt0(x.r.marge)]),
       [false, false, true, true, true]);
 
     // Top artistes
     const art = {};
     vs.forEach(({ v, r }) => {
       const nom = (v.artiste && v.artiste.trim()) ? v.artiste.trim() : "(non renseigné)";
-      art[nom] = art[nom] || { ca: 0, marge: 0, n: 0 };
-      art[nom].ca += r.venteTTC; art[nom].marge += r.margeBrute; art[nom].n++;
+      art[nom] = art[nom] || { ca: 0, ht: 0, marge: 0, n: 0 };
+      art[nom].ca += r.venteTTC; art[nom].ht += r.venteHT; art[nom].marge += r.marge; art[nom].n++;
     });
     const artArr = Object.keys(art).map(k => ({ nom: k, ...art[k] })).sort((a, b) => b.ca - a.ca).slice(0, 10);
     $("db-top-artistes").innerHTML = miniTable(
-      ["Artiste", "Nb", "CA TTC", "Marge", "% marge"],
-      artArr.map(a => [esc(a.nom), a.n, fmt0(a.ca), fmt0(a.marge), pct(a.ca ? a.marge / a.ca : 0)]),
+      ["Artiste", "Nb", "CA TTC", "Marge HT", "% marge"],
+      artArr.map(a => [esc(a.nom), a.n, fmt0(a.ca), fmt0(a.marge), pct(a.ht ? a.marge / a.ht : 0)]),
       [false, true, true, true, true]);
 
     // Répartition par régime
