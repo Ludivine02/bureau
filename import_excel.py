@@ -85,11 +85,64 @@ def norm_date(d):
         return ""
 
 
+def _num(x):
+    try:
+        return float(str(x).replace(" ", "").replace(",", ".")) if x not in ("", None) else 0.0
+    except ValueError:
+        return 0.0
+
+
+# Mots-clés de libellés qui ne sont PAS des œuvres d'art
+SERVICE_KW = ("commission", "refacturation", "refacture")
+ECRITURE_KW = ("extourne", "cumul", "ecart", "écart", "provision", "pca", "fae", "artlogic")
+
+
+def enrichir(v):
+    """Pré-remplit les champs déterminants quand ils se déduisent sans ambiguïté
+    du régime d'origine et du libellé. N'invente jamais les conditions du droit
+    de suite ni de la taxe forfaitaire (laissées vides, à valider)."""
+    notes = []
+    reg = v.get("regimeChoisi") or ""
+    achat = _num(v.get("achatTTC"))
+    lib = str(v.get("oeuvre") or "").lower()
+
+    # ---- Nature du bien ----
+    if any(k in lib for k in ECRITURE_KW) or (not lib.strip() and not _num(v.get("venteTTC"))):
+        # Ligne d'écriture comptable / cadrage : à exclure ou reclasser
+        notes.append("ligne d'écriture comptable à vérifier (exclure ou reclasser)")
+    elif any(k in lib for k in SERVICE_KW) or "frais" in lib:
+        v["natureBien"] = "prestation"
+        notes.append("nature = prestation/commission (déduit du libellé) → 20%")
+    elif reg == "DC_20":
+        v["natureBien"] = "bien_non_art"
+        notes.append("nature = bien non éligible au 5,5% (régime 20% d'origine)")
+
+    # ---- Mode d'acquisition (pilote marge vs droit commun) ----
+    if "MARGE" in reg:
+        v["modeAcquisition"] = "sans_tva"
+        notes.append("acquisition sans TVA déductible (régime de marge d'origine)")
+    elif reg in ("DC_55", "DC_20") and v.get("natureBien") != "":
+        if achat:
+            v["modeAcquisition"] = "tva_normale"
+            notes.append("acquisition avec TVA normale (déduit : achat présent + droit commun)")
+        else:
+            v["modeAcquisition"] = "aucun_achat"
+            notes.append("aucun achat (déduit)")
+    # EXPORT / INTRACOM : le mode d'acquisition n'a pas d'effet sur l'exonération → laissé vide.
+
+    if notes:
+        prefix = "[auto] " + " ; ".join(notes)
+        v["commentaire"] = (prefix + (" | " + v["commentaire"] if v.get("commentaire") else "")).strip()
+    return v
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("xlsx", help="chemin du fichier Excel")
     ap.add_argument("-o", "--out", default="ventes.json")
     ap.add_argument("--sheet", default="Suivi du CA")
+    ap.add_argument("--enrich", action="store_true",
+                    help="pré-remplit mode d'acquisition / nature du bien quand ils se déduisent du régime d'origine")
     args = ap.parse_args()
 
     try:
@@ -144,6 +197,8 @@ def main():
         for k, val in list(v.items()):
             if val is None:
                 v[k] = ""
+        if args.enrich:
+            v = enrichir(v)
         ventes.append(v)
 
     with open(args.out, "w", encoding="utf-8") as f:
