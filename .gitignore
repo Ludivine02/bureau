@@ -1,0 +1,13 @@
+# Données financières du client — ne JAMAIS versionner
+historique_ventes.json
+ventes*.json
+*.local.json
+
+# Sorties de l'outil (exports manuels)
+ventes_tva.csv
+outil_tva_galerie.json
+
+# Divers
+.DS_Store
+__pycache__/
+*.pyc
