@@ -1,9 +1,5 @@
-# Données financières du client — ne JAMAIS versionner
-historique_ventes.json
-ventes*.json
-*.local.json
-
-# Sorties de l'outil (exports manuels)
+# NB : historique_ventes.json est conservé dans le dépôt à la demande du client
+# (dépôt privé). Les autres exports/données restent ignorés.
 ventes_tva.csv
 outil_tva_galerie.json
 
