@@ -352,9 +352,10 @@
   function renderDS() {
     let h = '<div class="table-wrap"><table><thead><tr><th>Facture</th><th>Artiste</th><th>Œuvre</th>' +
       '<th class="num">Prix vente</th><th>Dû ?</th><th class="num">Montant</th><th>Reverser à</th><th>Motif</th></tr></thead><tbody>';
-    let total = 0, n = 0;
+    let total = 0, n = 0, potentielsNon = 0;
     state.ventes.forEach(v => {
       const ds = R.calculerDroitDeSuite(appliquerReferentiel(v));
+      if (!ds.du && ds.potentiel && (v.ds && v.ds.applicabiliteManuelle === "non")) potentielsNon++;
       const ref = state.artistes[(v.artiste || "").trim()];
       const organisme = ds.du ? (ref && ref.organisme ? ref.organisme : "à préciser") : "";
       if (ds.du) { total += ds.montant; n++; }
@@ -365,7 +366,12 @@
     });
     h += '</tbody><tfoot><tr><td colspan="5">TOTAL droit de suite (' + n + ' œuvre(s))</td><td class="num">' + fmt(total) + '</td><td colspan="2"></td></tr></tfoot></table></div>';
     if (!state.ventes.length) h = '<div class="empty">Aucune donnée.</div>';
-    $("ds-table").innerHTML = h;
+    // Indicateur agrégé d'omissions possibles (au lieu d'une alerte par ligne).
+    let banner = "";
+    if (potentielsNon > 0) banner = '<div class="alert warn"><b>' + potentielsNon +
+      ' vente(s)</b> d\'artistes éligibles, en France/UE et ≥ 750 € sont marquées <b>sans droit de suite</b>. ' +
+      'Vérifiez qu\'il s\'agit bien de <b>1ères cessions (marché primaire)</b> ou de cas d\'exonération — sinon le droit de suite a pu être omis.</div>';
+    $("ds-table").innerHTML = banner + h;
   }
 
   /* =================================================================

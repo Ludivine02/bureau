@@ -248,52 +248,43 @@ const REGLES = (function () {
     const alertes = [];
 
     // Décision manuelle (reprise d'une analyse déjà réalisée) — prioritaire.
+    // Évaluation conditionnelle (artiste éligible + lieu + prix + revente).
+    const cond = conditionsDroitDeSuite(v, prix);
+
     if (ds.applicabiliteManuelle === "non") {
-      return { du: false, montant: 0, motif: "Non applicable (décision reprise)", alertes };
+      // potentiel = vrai si les critères semblent réunis malgré le « non » (omission possible).
+      return { du: false, montant: 0, motif: "Non applicable (décision reprise)", potentiel: cond.du, alertes };
     }
     if (ds.applicabiliteManuelle === "oui") {
       const montant = (ds.montantReference != null && ds.montantReference !== "")
         ? num(ds.montantReference) : baremeDroitDeSuite(prix);
-      return { du: true, montant: r2(montant), motif: "Applicable (décision reprise)", alertes };
+      return { du: true, montant: r2(montant), motif: "Applicable (décision reprise)", potentiel: true, alertes };
     }
 
-    // Conditions d'exclusion (motifs)
-    if (v.natureBien !== "oeuvre_art") {
-      return { du: false, montant: 0, motif: "Œuvre non éligible (pas une œuvre d'art originale)", alertes };
-    }
-    if (ds.oeuvreOriginale === false) {
-      return { du: false, montant: 0, motif: "Œuvre non originale", alertes };
-    }
-    if (ds.premiereCession === true) {
-      return { du: false, montant: 0, motif: "1ère cession par l'artiste (pas de revente)", alertes };
-    }
-    if (ds.artisteVivantOuMoins70 === false) {
-      return { du: false, montant: 0, motif: "Artiste décédé depuis + de 70 ans", alertes };
-    }
-    if (ds.venteSoumiseFrance === false) {
-      return { du: false, montant: 0, motif: "Vente non établie en France / hors champ", alertes };
-    }
-    if (prix < PARAMS.droitDeSuite.seuilApplication) {
-      return { du: false, montant: 0, motif: "Vente < 750 €", alertes };
-    }
-
-    // Exonération du revendeur : acquise directement de l'artiste < 3 ans ET prix < 10 000 €
-    if (ds.acquiseDirecteArtisteMoins3ans === true && prix < PARAMS.droitDeSuite.exoRevente.prixVente) {
-      return {
-        du: false, montant: 0,
-        motif: "Exonéré (acquise directement de l'artiste < 3 ans et prix < 10 000 €)",
-        alertes
-      };
-    }
-
-    // Critères réunis -> barème
-    const montant = baremeDroitDeSuite(prix);
+    // Pas de décision saisie : on PRÉ-REMPLIT à partir des conditions.
+    if (!cond.du) return { du: false, montant: 0, motif: cond.motif, potentiel: false, alertes };
     if (ds.artisteVivantOuMoins70 == null) {
-      alertes.push(warn("DS_ARTISTE",
-        "Confirmez : l'artiste est-il vivant ou décédé depuis ≤ 70 ans ? (condition du droit de suite)"));
+      alertes.push(info("DS_ARTISTE_AUTO",
+        "Droit de suite présumé dû. Statut de l'artiste non référencé : à confirmer dans l'onglet Artistes."));
     }
-    return { du: true, montant: r2(montant), motif: "OK - Critères réunis", alertes };
+    return { du: true, montant: r2(baremeDroitDeSuite(prix)), motif: "OK - Critères réunis", potentiel: true, alertes };
   }
+
+  // Conditions du droit de suite (hors décision manuelle). Le lieu (zone) est
+  // déterminant : hors UE -> hors champ du droit de suite ; FR/UE -> dans le champ.
+  function conditionsDroitDeSuite(v, prix) {
+    const ds = v.ds || {};
+    if (v.natureBien !== "oeuvre_art") return { du: false, motif: "Œuvre non éligible (pas une œuvre d'art originale)" };
+    if (ds.oeuvreOriginale === false) return { du: false, motif: "Œuvre non originale" };
+    if (ds.premiereCession === true) return { du: false, motif: "1ère cession par l'artiste (pas de revente)" };
+    if (ds.artisteVivantOuMoins70 === false) return { du: false, motif: "Artiste décédé depuis + de 70 ans" };
+    if (v.zone === "HUE" || ds.venteSoumiseFrance === false) return { du: false, motif: "Vente hors UE / non établie en France — hors champ" };
+    if (prix < PARAMS.droitDeSuite.seuilApplication) return { du: false, motif: "Vente < 750 €" };
+    if (ds.acquiseDirecteArtisteMoins3ans === true && prix < PARAMS.droitDeSuite.exoRevente.prixVente)
+      return { du: false, motif: "Exonéré (acquise directement de l'artiste < 3 ans et prix < 10 000 €)" };
+    return { du: true, motif: "OK - Critères réunis" };
+  }
+  function zoneLabel(z) { return z === "FR" ? "France" : z === "UE" ? "UE" : z === "HUE" ? "hors UE" : "?"; }
 
   function baremeDroitDeSuite(prix) {
     let reste = prix, total = 0, borneBasse = 0;
