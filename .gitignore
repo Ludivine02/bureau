@@ -3,6 +3,9 @@
 ventes_tva.csv
 outil_tva_galerie.json
 
+# Artefact de distribution régénérable (zip du code déjà versionné)
+outil_tva_galerie.zip
+
 # Divers
 .DS_Store
 __pycache__/
