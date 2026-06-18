@@ -137,6 +137,12 @@
 
       <fieldset>
         <legend>Droit de suite</legend>
+        <label class="fld"><span>Décision (reprise d'une analyse existante)</span>
+          <select id="f-ds-applicabiliteManuelle">
+            <option value="">Selon les conditions ci-dessous</option>
+            <option value="oui">Applicable (forcer)</option>
+            <option value="non">Non applicable (forcer)</option>
+          </select></label>
         <div class="grid">
           <label class="fld"><span>1ère cession par l'artiste ?</span>
             <select id="f-ds-premiereCession"><option value="">—</option><option value="non">Non (revente)</option><option value="oui">Oui (1ère vente)</option></select></label>
@@ -152,6 +158,12 @@
       <fieldset>
         <legend>Taxe forfaitaire sur les objets précieux</legend>
         <div class="q-box"><span class="q">Le vendeur (cédant) est-il un particulier ?</span> La taxe forfaitaire ne concerne que les cessions par des particuliers ; la galerie intermédiaire en France la verse pour leur compte.</div>
+        <label class="fld"><span>Décision (reprise d'une analyse existante)</span>
+          <select id="f-tf-applicabiliteManuelle">
+            <option value="">Selon les conditions ci-dessous</option>
+            <option value="oui">Applicable (forcer)</option>
+            <option value="non">Non applicable (forcer)</option>
+          </select></label>
         <div class="grid">
           <label class="fld"><span>Vendeur particulier ?</span>
             <select id="f-tf-vendeurParticulier"><option value="">—</option><option value="non">Non</option><option value="oui">Oui</option></select></label>
@@ -234,8 +246,8 @@
 <!-- ============ 6. CADRAGE COMPTA ============ -->
 <section class="view" id="view-cadrage">
   <div class="panel">
-    <h2>Cadrage avec la comptabilité</h2>
-    <p class="lead">Pour chaque compte produit, comparez le CA HT attendu (calculé par l'outil) au solde comptable. Saisissez les soldes compta : les écarts s'affichent automatiquement.</p>
+    <h2>Cadrage avec la comptabilité (Balance Générale)</h2>
+    <p class="lead">Trois volets : <b>A.</b> le CA par compte (classe 70), <b>B.</b> la TVA collectée, <b>C.</b> les achats &amp; coûts (classe 6). Les soldes de la Balance sont pré-chargés ; les écarts BG − outil s'affichent automatiquement.</p>
     <div id="cadrage-table"></div>
   </div>
 </section>

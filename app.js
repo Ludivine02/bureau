@@ -9,12 +9,12 @@
   const STORE_KEY = "outil_tva_galerie_v1";
 
   /* ---------- État ---------- */
-  let state = { ventes: [], compta: {} };
+  let state = { ventes: [], compta: {}, balanceBG: {} };
 
   function load() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
-      if (raw) state = Object.assign({ ventes: [], compta: {} }, JSON.parse(raw));
+      if (raw) state = Object.assign({ ventes: [], compta: {}, balanceBG: {} }, JSON.parse(raw));
     } catch (e) { console.warn("Lecture stockage:", e); }
   }
   function save() {
@@ -99,6 +99,7 @@
       regimeChoisi: $("f-regimeChoisi").value,
       commentaire: $("f-commentaire").value,
       ds: {
+        applicabiliteManuelle: $("f-ds-applicabiliteManuelle").value,
         oeuvreOriginale: oui($("f-oeuvreOriginale").value),
         premiereCession: oui($("f-ds-premiereCession").value),
         artisteVivantOuMoins70: oui($("f-ds-artisteVivantOuMoins70").value),
@@ -106,6 +107,7 @@
         acquiseDirecteArtisteMoins3ans: oui($("f-ds-acquiseDirecteArtisteMoins3ans").value)
       },
       tf: {
+        applicabiliteManuelle: $("f-tf-applicabiliteManuelle").value,
         vendeurParticulier: oui($("f-tf-vendeurParticulier").value),
         typeObjet: $("f-tf-typeObjet").value,
         vendeurDomicilieFR: oui($("f-tf-vendeurDomicilieFR").value),
@@ -113,6 +115,21 @@
         prixCession: $("f-tf-prixCession").value
       }
     };
+  }
+
+  // Conserve les champs de référence (issus de l'import) non éditables dans le formulaire.
+  function fusionnerReferences(nouvelle, ancienne) {
+    if (!ancienne) return nouvelle;
+    ["commissions", "regimeSource", "exercice", "htCompta", "tvaCompta", "compteRef",
+      "venteSurStock", "achats2026", "margeBaseRef"].forEach(k => {
+      if (ancienne[k] != null && nouvelle[k] == null) nouvelle[k] = ancienne[k];
+    });
+    // Références DS / TF (base et montant repris)
+    ["baseReference", "montantReference"].forEach(k => {
+      if (ancienne.ds && ancienne.ds[k] != null && (nouvelle.ds[k] == null)) nouvelle.ds[k] = ancienne.ds[k];
+      if (ancienne.tf && ancienne.tf[k] != null && (nouvelle.tf[k] == null)) nouvelle.tf[k] = ancienne.tf[k];
+    });
+    return nouvelle;
   }
   const setBool = (id, b) => { $(id).value = b === true ? "oui" : b === false ? "non" : ""; };
   function ecrireFormulaire(v) {
@@ -140,11 +157,13 @@
     $("f-regimeChoisi").value = v.regimeChoisi || "";
     $("f-commentaire").value = v.commentaire || "";
     const ds = v.ds || {};
+    $("f-ds-applicabiliteManuelle").value = ds.applicabiliteManuelle || "";
     setBool("f-ds-premiereCession", ds.premiereCession);
     setBool("f-ds-artisteVivantOuMoins70", ds.artisteVivantOuMoins70);
     setBool("f-ds-venteSoumiseFrance", ds.venteSoumiseFrance);
     setBool("f-ds-acquiseDirecteArtisteMoins3ans", ds.acquiseDirecteArtisteMoins3ans);
     const tf = v.tf || {};
+    $("f-tf-applicabiliteManuelle").value = tf.applicabiliteManuelle || "";
     setBool("f-tf-vendeurParticulier", tf.vendeurParticulier);
     $("f-tf-typeObjet").value = tf.typeObjet || "art";
     setBool("f-tf-vendeurDomicilieFR", tf.vendeurDomicilieFR);
@@ -193,18 +212,24 @@
     let h = '<div class="table-wrap"><table><thead><tr>' +
       '<th>Ligne</th><th>Facture</th><th>Date</th><th>Artiste</th><th>Œuvre</th>' +
       '<th class="num">Vente TTC</th><th class="num">Achat TTC</th><th class="num">Marge</th><th class="num">% marge</th>' +
-      '<th>Régime</th><th class="num">Base HT</th><th class="num">TVA</th><th>DS</th><th>TF</th><th>!</th><th></th></tr></thead><tbody>';
+      '<th>Régime</th><th class="num">HT (réf. compta)</th><th class="num">TVA (réf. compta)</th>' +
+      '<th class="num">Base HT (outil)</th><th class="num">TVA (outil)</th><th class="num">Écart TVA</th><th>DS</th><th>TF</th><th>!</th><th></th></tr></thead><tbody>';
     state.ventes.forEach(v => {
       const r = evaluer(v);
       const nbA = r.alertes.length;
       const nbDanger = r.alertes.filter(a => a.niveau === "danger").length;
+      const htRef = v.htCompta === "" || v.htCompta == null ? null : R.num(v.htCompta);
+      const tvaRef = v.tvaCompta === "" || v.tvaCompta == null ? null : R.num(v.tvaCompta);
+      const ecartTVA = tvaRef == null ? null : R.r2(r.tva.tva - tvaRef);
       h += '<tr>';
       h += '<td>' + esc(v.ligneCompta) + '</td><td>' + esc(v.numFacture) + '</td><td>' + esc(v.dateFacture) + '</td>';
       h += '<td>' + esc(v.artiste) + '</td><td>' + esc(v.oeuvre) + '</td>';
       h += '<td class="num">' + fmt(r.venteTTC) + '</td><td class="num">' + fmt(r.achatTTC) + '</td>';
       h += '<td class="num">' + fmt(r.margeBrute) + '</td><td class="num">' + pct(r.tauxMarge) + '</td>';
       h += '<td><span class="tag ' + (r.tva.regime ? r.tva.regime.code : "") + '">' + esc(r.tva.regime ? r.tva.regime.label : "?") + '</span></td>';
+      h += '<td class="num">' + (htRef == null ? "—" : fmt(htRef)) + '</td><td class="num">' + (tvaRef == null ? "—" : fmt(tvaRef)) + '</td>';
       h += '<td class="num">' + fmt(r.tva.baseHT) + '</td><td class="num">' + fmt(r.tva.tva) + '</td>';
+      h += '<td class="num">' + (ecartTVA == null ? "" : '<span class="' + (Math.abs(ecartTVA) < 1 ? "ecart-ok" : "ecart-ko") + '">' + fmt(ecartTVA) + '</span>') + '</td>';
       h += '<td class="num">' + (r.ds.du ? fmt(r.ds.montant) : "—") + '</td>';
       h += '<td class="num">' + (r.tf.du ? fmt(r.tf.montant) : "—") + '</td>';
       h += '<td>' + (nbA ? '<span class="dot ' + (nbDanger ? "danger" : "warn") + '"></span>' + nbA : "") + '</td>';
@@ -304,37 +329,77 @@
   /* =================================================================
    *  CADRAGE COMPTABLE
    * ================================================================= */
+  // CA HT "comptable" d'une vente (base imposable + part non imposable + montant exonéré).
+  function caHTComptable(t, v) {
+    const exo = t.regime && (t.regime.code === "EXPORT" || t.regime.code === "INTRACOM");
+    return t.baseHT + (t.partNonImposable || 0) + (exo ? R.num(v.venteTTC) : 0);
+  }
+  const soldeBG = (c) => R.num(state.balanceBG[c]);
+  const ecartCell = (e) => '<span class="' + (Math.abs(e) < 1 ? "ecart-ok" : "ecart-ko") + '">' + fmt(e) + '</span>';
+
   function renderCadrage() {
-    const acc = {}; // par compte
+    if (!state.ventes.length) { $("cadrage-table").innerHTML = '<div class="empty">Aucune donnée.</div>'; return; }
+
+    /* --- Volet A : CA classe 70 par compte --- */
+    const caCpt = {};
     state.ventes.forEach(v => {
       const t = R.calculerTVA(v);
       const c = t.compte || "—";
-      acc[c] = acc[c] || { compte: c, libelle: t.libelleCompte || "", ht: 0, tva: 0 };
-      // pour marge, le "produit" comptable = base HT + non imposable ; sinon base HT
-      acc[c].ht += t.baseHT + (t.partNonImposable || 0);
-      acc[c].tva += t.tva;
+      caCpt[c] = caCpt[c] || { libelle: t.libelleCompte || "", ht: 0, tva: 0 };
+      caCpt[c].ht += caHTComptable(t, v); caCpt[c].tva += t.tva;
     });
-    let h = '<div class="table-wrap"><table><thead><tr><th>Compte</th><th>Libellé</th>' +
-      '<th class="num">CA HT attendu (outil)</th><th class="num">Solde compta</th><th class="num">Écart</th><th class="num">TVA attendue</th></tr></thead><tbody>';
-    let totAtt = 0, totCompta = 0;
-    Object.keys(acc).sort().forEach(c => {
-      const r = acc[c];
-      const saisi = state.compta[c] != null ? state.compta[c] : "";
-      const soldeNum = R.num(saisi);
-      const ecart = saisi === "" ? null : R.r2(r.ht - soldeNum);
-      totAtt += r.ht; totCompta += soldeNum;
-      h += '<tr><td>' + esc(r.compte) + '</td><td>' + esc(r.libelle) + '</td>' +
+    let hA = '<div class="table-wrap"><table><thead><tr><th>Compte</th><th>Libellé</th>' +
+      '<th class="num">CA HT outil</th><th class="num">Solde BG (HT)</th><th class="num">Écart BG − outil</th></tr></thead><tbody>';
+    let totO = 0, totB = 0;
+    Object.keys(caCpt).sort().forEach(c => {
+      const r = caCpt[c];
+      const saisiBG = state.balanceBG[c] != null && state.balanceBG[c] !== "" ? state.balanceBG[c] : "";
+      const bg = R.num(saisiBG);
+      const ecart = saisiBG === "" ? null : R.r2(bg - r.ht);
+      totO += r.ht; totB += bg;
+      hA += '<tr><td>' + esc(c) + '</td><td>' + esc(r.libelle) + '</td>' +
         '<td class="num">' + fmt(r.ht) + '</td>' +
-        '<td class="num"><input type="number" step="0.01" data-compte="' + esc(c) + '" value="' + esc(saisi) + '" style="max-width:130px;text-align:right"></td>' +
-        '<td class="num">' + (ecart == null ? "" : '<span class="' + (Math.abs(ecart) < 0.5 ? "ecart-ok" : "ecart-ko") + '">' + fmt(ecart) + '</span>') + '</td>' +
-        '<td class="num">' + fmt(r.tva) + '</td></tr>';
+        '<td class="num"><input type="number" step="0.01" data-bg="' + esc(c) + '" value="' + esc(saisiBG) + '" style="max-width:130px;text-align:right"></td>' +
+        '<td class="num">' + (ecart == null ? "" : ecartCell(ecart)) + '</td></tr>';
     });
-    h += '</tbody><tfoot><tr><td colspan="2">TOTAL</td><td class="num">' + fmt(totAtt) + '</td><td class="num">' + fmt(totCompta) + '</td>' +
-      '<td class="num"><span class="' + (Math.abs(totAtt - totCompta) < 0.5 ? "ecart-ok" : "ecart-ko") + '">' + fmt(totAtt - totCompta) + '</span></td><td></td></tr></tfoot></table></div>';
-    if (!state.ventes.length) h = '<div class="empty">Aucune donnée.</div>';
-    $("cadrage-table").innerHTML = h;
-    $("cadrage-table").querySelectorAll("input[data-compte]").forEach(inp => {
-      inp.onchange = () => { state.compta[inp.getAttribute("data-compte")] = inp.value; save(); renderCadrage(); };
+    hA += '</tbody><tfoot><tr><td colspan="2">TOTAL classe 70</td><td class="num">' + fmt(totO) + '</td>' +
+      '<td class="num">' + fmt(totB) + '</td><td class="num">' + ecartCell(R.r2(totB - totO)) + '</td></tr></tfoot></table></div>';
+
+    /* --- Volet B : TVA collectée --- */
+    let tvaO = 0; state.ventes.forEach(v => tvaO += R.calculerTVA(v).tva);
+    const tvaB = R.CADRAGE.tvaCollectee.reduce((s, c) => s + soldeBG(c), 0);
+    let hB = '<div class="table-wrap"><table><thead><tr><th>Indicateur</th><th class="num">Montant</th></tr></thead><tbody>' +
+      '<tr><td>TVA collectée outil (toutes lignes)</td><td class="num">' + fmt(tvaO) + '</td></tr>' +
+      '<tr><td>TVA collectée Balance (comptes ' + R.CADRAGE.tvaCollectee.join(", ") + ')</td><td class="num">' + fmt(tvaB) + '</td></tr>' +
+      '<tr><td><b>Écart BG − outil</b></td><td class="num">' + ecartCell(R.r2(tvaB - tvaO)) + '</td></tr>' +
+      '</tbody></table></div>';
+
+    /* --- Volet C : achats & coûts (classe 6) --- */
+    const som = { achat: 0, frais: 0, commissions: 0, ds: 0, tf: 0 };
+    state.ventes.forEach(v => {
+      som.achat += R.num(v.achatTTC); som.frais += R.num(v.fraisAccessoiresHT); som.commissions += R.num(v.commissions);
+      const ds = R.calculerDroitDeSuite(v); if (ds.du) som.ds += ds.montant;
+      const tf = R.calculerTaxeForfaitaire(v); if (tf.du) som.tf += tf.montant;
+    });
+    let hC = '<div class="table-wrap"><table><thead><tr><th>Poste</th><th>Comptes BG</th>' +
+      '<th class="num">Outil</th><th class="num">Balance</th><th class="num">Écart BG − outil</th></tr></thead><tbody>';
+    R.CADRAGE.achats.forEach(g => {
+      const o = som[g.cle];
+      const b = Math.abs(g.comptes.reduce((s, c) => s + soldeBG(c), 0));
+      hC += '<tr><td>' + esc(g.label) + '</td><td><small>' + g.comptes.join(", ") + '</small></td>' +
+        '<td class="num">' + fmt(o) + '</td><td class="num">' + fmt(b) + '</td><td class="num">' + ecartCell(R.r2(b - o)) + '</td></tr>';
+    });
+    hC += '</tbody></table></div>';
+
+    $("cadrage-table").innerHTML =
+      '<h3>A. Cadrage du CA par compte (classe 70, HT)</h3>' +
+      '<p class="hint">Le solde BG est pré-rempli depuis la Balance importée ; vous pouvez l\'ajuster (sauvegarde automatique).</p>' + hA +
+      '<h3>B. Cadrage de la TVA collectée</h3>' + hB +
+      '<h3>C. Cadrage des achats &amp; coûts (classe 6)</h3>' +
+      '<p class="hint">Montants de l\'outil confrontés aux soldes des comptes d\'achats de la Balance (en valeur absolue).</p>' + hC;
+
+    $("cadrage-table").querySelectorAll("input[data-bg]").forEach(inp => {
+      inp.onchange = () => { state.balanceBG[inp.getAttribute("data-bg")] = inp.value; save(); renderCadrage(); };
     });
   }
 
@@ -479,13 +544,17 @@
   }
   function exportCSV() {
     const cols = ["ligneCompta", "numFacture", "dateFacture", "artiste", "oeuvre", "natureBien", "modeAcquisition",
-      "zone", "typeClient", "venteTTC", "achatTTC", "fraisAccessoiresHT", "regime", "baseHT", "tva", "droitDeSuite", "taxeForfaitaire", "compte"];
+      "zone", "typeClient", "venteTTC", "achatTTC", "fraisAccessoiresHT", "HT_ref_compta", "TVA_ref_compta",
+      "regime", "baseHT_outil", "tva_outil", "ecart_tva", "droitDeSuite", "taxeForfaitaire", "compte"];
     let csv = cols.join(";") + "\n";
     state.ventes.forEach(v => {
       const r = evaluer(v);
+      const tvaRef = v.tvaCompta === "" || v.tvaCompta == null ? "" : R.num(v.tvaCompta);
+      const ecart = tvaRef === "" ? "" : R.r2(r.tva.tva - tvaRef);
       const row = [v.ligneCompta, v.numFacture, v.dateFacture, v.artiste, v.oeuvre, v.natureBien, v.modeAcquisition,
         v.zone, v.typeClient, R.num(v.venteTTC), R.num(v.achatTTC), R.num(v.fraisAccessoiresHT),
-        r.tva.regime ? r.tva.regime.code : "", r.tva.baseHT, r.tva.tva, r.ds.du ? r.ds.montant : 0, r.tf.du ? r.tf.montant : 0, r.tva.compte || ""];
+        v.htCompta === "" || v.htCompta == null ? "" : R.num(v.htCompta), tvaRef,
+        r.tva.regime ? r.tva.regime.code : "", r.tva.baseHT, r.tva.tva, ecart, r.ds.du ? r.ds.montant : 0, r.tf.du ? r.tf.montant : 0, r.tva.compte || ""];
       csv += row.map(c => '"' + String(c == null ? "" : c).replace(/"/g, '""') + '"').join(";") + "\n";
     });
     télécharger("ventes_tva.csv", "﻿" + csv, "text/csv");
@@ -502,7 +571,7 @@
         if (file.name.endsWith(".json")) {
           const data = JSON.parse(reader.result);
           if (Array.isArray(data)) state.ventes = data;
-          else { state.ventes = data.ventes || []; state.compta = data.compta || {}; }
+          else { state.ventes = data.ventes || []; state.compta = data.compta || {}; state.balanceBG = data.balanceBG || {}; }
         } else {
           importerCSV(reader.result);
         }
@@ -624,9 +693,10 @@
     document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => switchView(b.getAttribute("data-view")));
     $("form-vente").onsubmit = (e) => {
       e.preventDefault();
-      const v = lireFormulaire();
+      let v = lireFormulaire();
       const idx = state.ventes.findIndex(x => x.id === v.id);
-      if (idx >= 0) state.ventes[idx] = v; else state.ventes.push(v);
+      if (idx >= 0) { v = fusionnerReferences(v, state.ventes[idx]); state.ventes[idx] = v; }
+      else state.ventes.push(v);
       save(); refreshAll(); resetFormulaire(); switchView("ventes");
     };
     $("btn-evaluer").onclick = () => { $("live-result").style.display = "block"; $("live-result-body").innerHTML = renderAnalyse(lireFormulaire()); };
@@ -656,6 +726,7 @@
     if (seed && Array.isArray(seed.ventes) && seed.ventes.length) {
       state.ventes = seed.ventes;
       state.compta = seed.compta || {};
+      state.balanceBG = seed.balanceBG || {};
       save();
     }
   }

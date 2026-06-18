@@ -18,6 +18,7 @@ const REGLES = (function () {
    * ----------------------------------------------------------------- */
   const PARAMS = {
     version: "2025-2026",
+    exerciceCourant: 2026,
     tva: {
       tauxReduitArt: 0.055,   // œuvres d'art / collection / antiquité (art. 278-0 bis CGI, depuis 1/1/2025)
       tauxNormal: 0.20,       // biens hors champ art, prestations, commissions, produits annexes
@@ -86,24 +87,45 @@ const REGLES = (function () {
    *  Tiré du plan de comptes de la galerie (onglet "Listes").
    * ----------------------------------------------------------------- */
   const PLAN_COMPTES = {
-    // Marge réelle
-    MARGE_FR: { compte: "70710000", libelle: "Ventes œuvres - Marge Réelle France" },
-    MARGE_UE: { compte: "70711000", libelle: "Ventes œuvres - Marge Réelle UE" },
-    MARGE_EXPORT: { compte: "70712000", libelle: "Ventes œuvres - Marge Réelle Export" },
-    MARGE_NON_SOUMIS: { compte: "70713000", libelle: "Ventes œuvres - Prix Achat / CA Non soumis" },
-    TVA_MARGE_20: { compte: "70714000", libelle: "TVA/Marges 20%" },
-    // Droit commun
-    DC_FR: { compte: "70703000", libelle: "Ventes œuvres - Droit Commun France" },
-    DC_UE: { compte: "70703100", libelle: "Ventes œuvres - Droit Commun UE" },
-    DC_HUE: { compte: "70703200", libelle: "Ventes œuvres - Droit Commun HUE" },
-    // Taux réduit 5,5%
-    TR_FR: { compte: "70704000", libelle: "Ventes œuvres - Taux réduit France" },
-    TR_UE: { compte: "70704100", libelle: "Ventes œuvres - Taux réduit UE" },
-    TR_HUE: { compte: "70704200", libelle: "Ventes œuvres - Taux réduit HUE" },
-    // Annexes
-    COMMISSION: { compte: "70810000", libelle: "Commissions s/vte" },
-    PRODUIT_ANNEXE_20: { compte: "70882000", libelle: "Produits activités annexes - 20%" },
-    PRODUIT_ANNEXE_NS: { compte: "70880000", libelle: "Produits activités annexes - Non Soumis" }
+    "70703000": "Ventes œuvres - Droit Commun France",
+    "70703100": "Ventes œuvres - Droit Commun UE",
+    "70703200": "Ventes œuvres - Droit Commun HUE",
+    "70704000": "Ventes œuvres - Taux réduit France",
+    "70704100": "Ventes œuvres - Taux réduit UE",
+    "70704200": "Ventes œuvres - Taux réduit HUE",
+    "70709901": "Cut-off N-1 FR taux normal",
+    "70709902": "Cut-off N-1 FR taux réduit",
+    "70709903": "Cut-off N-1 UE",
+    "70709904": "Cut-off N-1 HUE",
+    "70710000": "Ventes œuvres - Marge Réelle France",
+    "70711000": "Ventes œuvres - Marge Réelle UE",
+    "70712000": "Ventes œuvres - Marge Réelle Export",
+    "70810100": "Commissions sur ventes France",
+    "70810200": "Commissions sur ventes UE",
+    "70810300": "Commissions sur ventes HUE",
+    "70811000": "Ventes de catalogues 5,5%",
+    "70820000": "Location Le Muy",
+    "70880000": "Produits annexes HUE",
+    "70880500": "Produits annexes UE",
+    "70882000": "Produits annexes 20%",
+    "70884000": "Produits annexes 5,5%"
+  };
+
+  /* -----------------------------------------------------------------
+   *  CONFIGURATION DU CADRAGE COMPTABLE (outil <-> Balance Générale)
+   *  Regroupe les comptes de la balance à confronter aux totaux de l'outil.
+   * ----------------------------------------------------------------- */
+  const CADRAGE = {
+    // Comptes de TVA collectée (classe 4457*) à comparer à la TVA de l'outil.
+    tvaCollectee: ["44571200", "44571300", "44571310", "44571340", "44571400"],
+    // Cadrage des achats & coûts (classe 6) : champ de l'outil <-> comptes BG.
+    achats: [
+      { cle: "achat", label: "Achats d'œuvres (vendus + non vendus)", comptes: ["60740000", "607500"] },
+      { cle: "frais", label: "Frais accessoires d'achat", comptes: ["607704"] },
+      { cle: "commissions", label: "Commissions sur ventes", comptes: ["60780300", "60780301", "60780400"] },
+      { cle: "ds", label: "Droit de suite", comptes: ["60737000"] },
+      { cle: "tf", label: "Taxe forfaitaire", comptes: ["60770500"] }
+    ]
   };
 
   /* =================================================================
@@ -121,131 +143,93 @@ const REGLES = (function () {
    *    venteTTC, achatTTC, fraisAccessoiresHT
    *  Sortie : { regime, baseHT, tva, partNonImposable, ligneCA3, alertes[], compte }
    * ================================================================= */
+  const CODES_REGIME = ["EXPORT", "INTRACOM", "DC_55", "DC_20", "MARGE"];
+
   function calculerTVA(v) {
     const alertes = [];
-    const ttc = num(v.venteTTC);
-    const achat = num(v.achatTTC);
-    const frais = num(v.fraisAccessoiresHT);
-
     const out = {
-      regime: null, baseHT: 0, tva: 0, partNonImposable: 0,
+      regime: null, regimeRecommande: null, baseHT: 0, tva: 0, partNonImposable: 0,
       ligneCA3: "", alertes, compte: null, libelleCompte: ""
     };
 
-    // ---- A. PRIORITÉ GÉOGRAPHIQUE : export / intracom (exonérés) ----
-    if (v.zone === "HUE") {
-      out.regime = LISTES.regimes.EXPORT;
-      out.ligneCA3 = "04";
-      if (!v.justificatifExport) {
-        alertes.push(warn("EXPORT_JUSTIF",
-          "Exonération export : avez-vous le justificatif de sortie du territoire UE (DAU/preuve douanière) ? Sans lui, l'exonération est refusée."));
-      }
-      affecterCompte(out, v, "EXPORT");
-      return out;
+    // 1) Régime recommandé par l'outil (déduit du contexte) — sert de contrôle.
+    const recommande = deriverRegimeCode(v);
+    out.regimeRecommande = LISTES.regimes[recommande] || null;
+
+    // 2) Régime APPLIQUÉ : on respecte le régime saisi s'il est valide
+    //    (reprise d'une base déjà qualifiée), sinon on applique la recommandation.
+    const choisiValide = CODES_REGIME.indexOf(v.regimeChoisi) >= 0;
+    const applique = choisiValide ? v.regimeChoisi : recommande;
+
+    // 3) Calcul des montants selon le régime appliqué.
+    appliquerRegime(out, v, applique, alertes);
+    out.regime = LISTES.regimes[applique];
+
+    // 4) Contrôle : divergence entre régime saisi et régime recommandé.
+    if (choisiValide && v.regimeChoisi !== recommande) {
+      alertes.push(warn("REGIME_DIVERGENT",
+        "Régime appliqué : « " + LISTES.regimes[applique].label + " ». L'outil aurait plutôt déduit « " +
+        LISTES.regimes[recommande].label + " » du contexte (zone/nature/acquisition). À vérifier."));
     }
-
-    if (v.zone === "UE" && v.typeClient === "professionnel") {
-      out.regime = LISTES.regimes.INTRACOM;
-      out.ligneCA3 = "06";
-      if (!v.numTvaIntra) {
-        alertes.push(warn("INTRACOM_TVA",
-          "Livraison intracom exonérée : le n° de TVA intracom du client est-il renseigné ET valide (VIES) ?"));
-      }
-      if (!v.transportHorsFR) {
-        alertes.push(warn("INTRACOM_TRANSPORT",
-          "Avez-vous la preuve du transport du bien hors de France vers l'autre État membre ?"));
-      }
-      affecterCompte(out, v, "INTRACOM");
-      return out;
-    }
-
-    if (v.zone === "UE" && v.typeClient === "particulier") {
-      alertes.push(info("UE_B2C",
-        "Vente à un particulier UE : pas d'exonération intracom. Traitée comme une vente taxable en France (sous réserve des seuils de vente à distance)."));
-      // on poursuit comme une vente taxable France
-    }
-
-    // ---- B. NATURE DU BIEN : hors champ œuvre d'art -> 20% ----
-    if (v.natureBien === "prestation" || v.natureBien === "bien_non_art") {
-      return calculerDroitCommun(out, v, ttc, PARAMS.tva.tauxNormal, "DC_20", "08 (+01)", alertes);
-    }
-    if (v.natureBien === "produit_annexe") {
-      // par défaut 20%, mais signalé pour vérification (certains produits annexes peuvent différer)
-      alertes.push(info("PRODUIT_ANNEXE",
-        "Produit annexe : vérifier le taux applicable (20% par défaut ; 5,5% catalogue, 10%/non soumis selon le cas)."));
-      return calculerDroitCommun(out, v, ttc, PARAMS.tva.tauxNormal, "DC_20", "08 (+01)", alertes);
-    }
-
-    // ---- C. ŒUVRE D'ART / COLLECTION / ANTIQUITÉ ----
-    // Le régime dépend du mode d'acquisition (réforme 2025).
-    const margePossible = (v.modeAcquisition === "sans_tva");
-
-    if (v.modeAcquisition === "tva_reduit") {
-      // Achat/import au taux réduit -> MARGE INTERDITE -> droit commun 5,5%
-      if (margeDemandee(v)) {
-        alertes.push(danger("MARGE_INTERDITE",
-          "Régime de la marge demandé mais œuvre acquise/importée au taux réduit 5,5% : INTERDIT depuis le 1/1/2025 (art. 297 A modifié). Application du droit commun 5,5%."));
-      }
-      return calculerDroitCommun(out, v, ttc, PARAMS.tva.tauxReduitArt, "DC_55", "09 (+01)", alertes);
-    }
-
-    if (margePossible) {
-      // Marge applicable de plein droit. Option 297 C possible pour le droit commun 5,5%.
-      if (v.optionDroitCommun) {
-        alertes.push(info("OPTION_297C",
-          "Option art. 297 C exercée : droit commun 5,5% sur le prix total au lieu de la marge. (Souvent plus avantageux pour le client.)"));
-        return calculerDroitCommun(out, v, ttc, PARAMS.tva.tauxReduitArt, "DC_55", "09 (+01)", alertes);
-      }
-      // Régime de la marge : 20% sur la marge
-      const marge = ttc - achat - frais;
-      if (marge < 0) {
-        alertes.push(danger("MARGE_NEGATIVE",
-          "Marge négative (prix de vente < prix d'achat + frais) : aucune TVA sur marge, mais vérifier la cohérence de l'opération."));
-      }
-      const margeHT = marge > 0 ? marge / (1 + PARAMS.tva.tauxMargeUnique) : 0;
-      const tvaMarge = r2(margeHT * PARAMS.tva.tauxMargeUnique);
-      out.regime = LISTES.regimes.MARGE;
-      out.baseHT = r2(margeHT);
-      out.tva = tvaMarge;
-      out.partNonImposable = r2(ttc - margeHT - tvaMarge); // prix d'achat + part non imposable, ligne 05
-      out.ligneCA3 = "08 (marge) + 05 (non imposable)";
-      alertes.push(info("MARGE_OPTION_RAPPEL",
-        "Comparez : 5,5% sur le total (" + r2(ttc / (1 + PARAMS.tva.tauxReduitArt) * PARAMS.tva.tauxReduitArt) +
-        " € de TVA via option 297 C) vs 20% sur marge (" + tvaMarge + " € de TVA)."));
-      affecterCompte(out, v, "MARGE");
-      return out;
-    }
-
-    if (v.modeAcquisition === "tva_normale") {
-      // Achat avec TVA 20% déductible : revente au régime de droit commun. Œuvre d'art -> 5,5%.
-      return calculerDroitCommun(out, v, ttc, PARAMS.tva.tauxReduitArt, "DC_55", "09 (+01)", alertes);
-    }
-
-    if (v.modeAcquisition === "aucun_achat") {
-      // Œuvre d'art vendue sans achat (création/dépôt) -> droit commun 5,5%
-      return calculerDroitCommun(out, v, ttc, PARAMS.tva.tauxReduitArt, "DC_55", "09 (+01)", alertes);
-    }
-
-    // Défaut prudent
-    alertes.push(warn("MODE_ACQ_INCONNU",
-      "Mode d'acquisition non renseigné : impossible de trancher marge / droit commun. Renseignez-le."));
-    return calculerDroitCommun(out, v, ttc, PARAMS.tva.tauxReduitArt, "DC_55", "09 (+01)", alertes);
-  }
-
-  function calculerDroitCommun(out, v, ttc, taux, codeRegime, ligne, alertes) {
-    const ht = ttc / (1 + taux);
-    out.regime = LISTES.regimes[codeRegime];
-    out.baseHT = r2(ht);
-    out.tva = r2(ht * taux);
-    out.partNonImposable = 0;
-    out.ligneCA3 = ligne;
-    affecterCompte(out, v, codeRegime);
     return out;
   }
 
-  // L'utilisateur a-t-il explicitement demandé/saisi un régime de marge ?
-  function margeDemandee(v) {
-    return v.regimeChoisi === "MARGE";
+  // Régime déduit du contexte (zone, nature du bien, mode d'acquisition).
+  function deriverRegimeCode(v) {
+    if (v.zone === "HUE") return "EXPORT";
+    if (v.zone === "UE" && v.typeClient === "professionnel") return "INTRACOM";
+    if (v.natureBien === "prestation" || v.natureBien === "bien_non_art") return "DC_20";
+    if (v.natureBien === "produit_annexe") return "DC_20"; // défaut (catalogue = 5,5% à préciser)
+    // Œuvre d'art / collection / antiquité (réforme 2025)
+    if (v.modeAcquisition === "tva_reduit") return "DC_55";   // marge interdite
+    if (v.modeAcquisition === "sans_tva") return v.optionDroitCommun ? "DC_55" : "MARGE";
+    return "DC_55"; // tva_normale, aucun_achat, ou défaut prudent
+  }
+
+  // Applique un régime donné : remplit base HT, TVA, part non imposable, ligne CA3, compte.
+  function appliquerRegime(out, v, code, alertes) {
+    const ttc = num(v.venteTTC), achat = num(v.achatTTC), frais = num(v.fraisAccessoiresHT);
+    switch (code) {
+      case "EXPORT":
+        out.ligneCA3 = "04";
+        if (!v.justificatifExport) alertes.push(warn("EXPORT_JUSTIF",
+          "Exonération export : avez-vous le justificatif de sortie du territoire UE (DAU/preuve douanière) ?"));
+        break;
+      case "INTRACOM":
+        out.ligneCA3 = "06";
+        if (!v.numTvaIntra) alertes.push(warn("INTRACOM_TVA",
+          "Livraison intracom exonérée : le n° de TVA intracom du client est-il renseigné ET valide (VIES) ?"));
+        if (!v.transportHorsFR) alertes.push(warn("INTRACOM_TRANSPORT",
+          "Avez-vous la preuve du transport du bien hors de France vers l'autre État membre ?"));
+        break;
+      case "DC_55":
+        out.baseHT = r2(ttc / (1 + PARAMS.tva.tauxReduitArt));
+        out.tva = r2(out.baseHT * PARAMS.tva.tauxReduitArt);
+        out.ligneCA3 = "09 (+01)";
+        break;
+      case "DC_20":
+        out.baseHT = r2(ttc / (1 + PARAMS.tva.tauxNormal));
+        out.tva = r2(out.baseHT * PARAMS.tva.tauxNormal);
+        out.ligneCA3 = "08 (+01)";
+        break;
+      case "MARGE": {
+        if (v.modeAcquisition === "tva_reduit") alertes.push(danger("MARGE_INTERDITE",
+          "Régime de la marge appliqué mais œuvre acquise/importée au taux réduit 5,5% : INTERDIT depuis le 1/1/2025 (art. 297 A). Repasser en droit commun 5,5%."));
+        const marge = ttc - achat - frais;
+        if (marge < 0) alertes.push(warn("MARGE_NEGATIVE",
+          "Marge négative (vente < achat + frais) : aucune TVA sur marge ; vérifier l'opération."));
+        const margeHT = marge > 0 ? marge / (1 + PARAMS.tva.tauxMargeUnique) : 0;
+        out.baseHT = r2(margeHT);
+        out.tva = r2(margeHT * PARAMS.tva.tauxMargeUnique);
+        out.partNonImposable = r2(ttc - margeHT - out.tva);
+        out.ligneCA3 = "08 (marge) + 05 (non imposable)";
+        alertes.push(info("MARGE_OPTION_RAPPEL",
+          "Option 297 C possible : 5,5% sur le total (" + r2(ttc / (1 + PARAMS.tva.tauxReduitArt) * PARAMS.tva.tauxReduitArt) +
+          " € de TVA) vs 20% sur marge (" + out.tva + " € de TVA)."));
+        break;
+      }
+    }
+    affecterCompte(out, v, code);
   }
 
   /* =================================================================
@@ -259,8 +243,19 @@ const REGLES = (function () {
    * ================================================================= */
   function calculerDroitDeSuite(v) {
     const ds = v.ds || {};
-    const prix = num(v.venteHT != null ? v.venteHT : reconstituerHT(v));
+    const prix = num(ds.baseReference != null && ds.baseReference !== "" ? ds.baseReference
+      : (v.venteHT != null ? v.venteHT : reconstituerHT(v)));
     const alertes = [];
+
+    // Décision manuelle (reprise d'une analyse déjà réalisée) — prioritaire.
+    if (ds.applicabiliteManuelle === "non") {
+      return { du: false, montant: 0, motif: "Non applicable (décision reprise)", alertes };
+    }
+    if (ds.applicabiliteManuelle === "oui") {
+      const montant = (ds.montantReference != null && ds.montantReference !== "")
+        ? num(ds.montantReference) : baremeDroitDeSuite(prix);
+      return { du: true, montant: r2(montant), motif: "Applicable (décision reprise)", alertes };
+    }
 
     // Conditions d'exclusion (motifs)
     if (v.natureBien !== "oeuvre_art") {
@@ -326,7 +321,19 @@ const REGLES = (function () {
   function calculerTaxeForfaitaire(v) {
     const tf = v.tf || {};
     const alertes = [];
-    const prix = num(tf.prixCession != null ? tf.prixCession : v.venteTTC);
+    const prix = num(tf.prixCession != null && tf.prixCession !== "" ? tf.prixCession : v.venteTTC);
+
+    // Décision manuelle (reprise d'une analyse déjà réalisée) — prioritaire.
+    if (tf.applicabiliteManuelle === "non") {
+      return { du: false, montant: 0, motif: "Non applicable (décision reprise)", alertes };
+    }
+    if (tf.applicabiliteManuelle === "oui") {
+      let tx = (tf.typeObjet === "metaux") ? PARAMS.taxeForfaitaire.tauxMetauxPrecieux : PARAMS.taxeForfaitaire.tauxObjetArt;
+      if (tf.vendeurDomicilieFR !== false) tx += PARAMS.taxeForfaitaire.tauxCRDS;
+      const montant = (tf.montantReference != null && tf.montantReference !== "")
+        ? num(tf.montantReference) : r2(prix * tx);
+      return { du: true, assiette: r2(prix), taux: tx, montant: r2(montant), motif: "Applicable (décision reprise)", alertes };
+    }
 
     if (!tf.vendeurParticulier) {
       return { du: false, montant: 0, motif: "Vendeur professionnel : hors champ de la taxe forfaitaire (relève des bénéfices pro)", alertes };
@@ -362,21 +369,49 @@ const REGLES = (function () {
    *  CADRAGE COMPTABLE : régime + zone -> compte produit
    * ================================================================= */
   function affecterCompte(out, v, codeRegime) {
+    const compte = compteDe(v, codeRegime);
+    out.compte = compte;
+    out.libelleCompte = PLAN_COMPTES[compte] || "";
+  }
+
+  // Une vente datée d'un exercice antérieur est basculée sur les comptes de cut-off.
+  function estCutoff(v) {
+    if (v.exercice && /n-?1|cut/i.test(String(v.exercice))) return true;
+    const d = String(v.dateFacture || "");
+    const m = d.match(/^(\d{4})/);
+    return m ? parseInt(m[1], 10) < PARAMS.exerciceCourant : false;
+  }
+
+  // Détermine le compte produit (classe 70) selon exercice, régime, zone et nature.
+  function compteDe(v, codeRegime) {
     const z = v.zone;
-    let key = null;
-    switch (codeRegime) {
-      case "MARGE": key = z === "UE" ? "MARGE_UE" : z === "HUE" ? "MARGE_EXPORT" : "MARGE_FR"; break;
-      case "DC_55": key = z === "UE" ? "TR_UE" : z === "HUE" ? "TR_HUE" : "TR_FR"; break;
-      case "DC_20":
-        if (v.natureBien === "prestation") { key = "COMMISSION"; break; }
-        if (v.natureBien === "produit_annexe") { key = "PRODUIT_ANNEXE_20"; break; }
-        key = z === "UE" ? "DC_UE" : z === "HUE" ? "DC_HUE" : "DC_FR"; break;
-      case "EXPORT": key = "TR_HUE"; break;     // export d'œuvre -> compte HUE
-      case "INTRACOM": key = "TR_UE"; break;    // livraison intra -> compte UE
-      default: key = "DC_FR";
+    if (estCutoff(v)) {
+      if (codeRegime === "EXPORT" || z === "HUE") return "70709904";
+      if (codeRegime === "INTRACOM" || z === "UE") return "70709903";
+      if (codeRegime === "DC_20") return "70709901";
+      return "70709902"; // DC_55 / MARGE / défaut : FR taux réduit
     }
-    const c = PLAN_COMPTES[key];
-    if (c) { out.compte = c.compte; out.libelleCompte = c.libelle; }
+    // Régime "source" (libellé d'origine repris de la base) — précise les annexes.
+    const lbl = String(v.regimeSource || "").toLowerCase();
+    if (lbl.indexOf("catalogue") >= 0) return "70811000";
+    if (lbl.indexOf("location") >= 0) return "70820000";
+    if (lbl.indexOf("produits annexes") >= 0 || v.natureBien === "produit_annexe") {
+      if (z === "HUE" || lbl.indexOf("hue") >= 0) return "70880000";
+      if (z === "UE" || lbl.indexOf(" ue") >= 0) return "70880500";
+      if (lbl.indexOf("5,5") >= 0) return "70884000";
+      return "70882000";
+    }
+    if (lbl.indexOf("commission") >= 0 || (v.natureBien === "prestation" && lbl === "")) {
+      return z === "UE" ? "70810200" : z === "HUE" ? "70810300" : "70810100";
+    }
+    switch (codeRegime) {
+      case "EXPORT": return "70703200";
+      case "INTRACOM": return "70703100";
+      case "DC_55": return z === "UE" ? "70704100" : z === "HUE" ? "70704200" : "70704000";
+      case "DC_20": return z === "UE" ? "70703100" : z === "HUE" ? "70703200" : "70703000";
+      case "MARGE": return z === "UE" ? "70711000" : z === "HUE" ? "70712000" : "70710000";
+    }
+    return "";
   }
 
   /* =================================================================
@@ -385,12 +420,7 @@ const REGLES = (function () {
    * ================================================================= */
   function controlerLigne(v, calc) {
     const a = [];
-    // Régime saisi vs régime calculé
-    if (v.regimeChoisi && calc.regime && v.regimeChoisi !== calc.regime.code) {
-      a.push(warn("REGIME_DIVERGENT",
-        "Régime saisi (" + libelleRegime(v.regimeChoisi) + ") ≠ régime déterminé par l'outil (" +
-        calc.regime.label + "). Vérifiez la qualification."));
-    }
+    // (La divergence régime saisi vs recommandé est gérée dans calculerTVA.)
     // Marge forfaitaire obsolète
     if (v.regimeChoisi === "MARGE_FORFAITAIRE" || v.regimeChoisi === "Marge forfaitaire") {
       a.push(danger("MARGE_FORF_SUPPRIMEE",
@@ -435,9 +465,9 @@ const REGLES = (function () {
    *  API PUBLIQUE
    * ================================================================= */
   return {
-    PARAMS, LISTES, PLAN_COMPTES,
+    PARAMS, LISTES, PLAN_COMPTES, CADRAGE,
     calculerTVA, calculerDroitDeSuite, calculerTaxeForfaitaire,
-    controlerLigne, baremeDroitDeSuite, r2, num
+    controlerLigne, baremeDroitDeSuite, estCutoff, r2, num
   };
 })();
 

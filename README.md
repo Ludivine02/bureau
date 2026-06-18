@@ -24,6 +24,12 @@ effacer » remet l'historique d'origine au rechargement suivant.
 Pour régénérer l'historique embarqué après une mise à jour de l'Excel :
 
 ```bash
+# Nouvelle base "OUTIL_TVA_GALERIE … .xlsx" (détectée automatiquement,
+# reprend ventes, achats, droit de suite, taxe forfaitaire et Balance Générale) :
+python3 import_excel.py "OUTIL_TVA_GALERIE_2026.xlsx" -o historique_ventes.json
+python3 build_seed.py
+
+# Ancien classeur "TABLEAU_MARGE …" (ajouter --enrich pour pré-remplir) :
 python3 import_excel.py "TABLEAU_MARGE_2026_POUR_TVA.xlsx" -o historique_ventes.json --enrich
 python3 build_seed.py
 ```
@@ -46,7 +52,7 @@ Fichiers :
 | **3 · Récap TVA (CA3)** | Ventilation par régime et par ligne de la CA3 (04 export, 06 intracom, 08 / 09, 05 non imposable). |
 | **4 · Droit de suite** | Œuvres concernées + barème dégressif (plafond 12 500 €). |
 | **5 · Taxe forfaitaire** | Cessions par des particuliers (art. 150 VI s.). |
-| **6 · Cadrage compta** | CA HT attendu par compte produit vs solde comptable saisi → écart automatique. |
+| **6 · Cadrage compta** | Cadrage avec la Balance Générale en 3 volets : **A.** CA par compte (classe 70), **B.** TVA collectée (44571*), **C.** achats & coûts (classe 6 : achats d'œuvres, frais, commissions, droit de suite, taxe forfaitaire). Écarts BG − outil automatiques. |
 | **7 · Contrôles** | Toutes les questions d'orientation et alertes consolidées (rouge = erreur probable). |
 
 ## Importer l'historique depuis l'ancien Excel
