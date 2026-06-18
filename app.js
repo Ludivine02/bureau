@@ -645,8 +645,23 @@
     $("db-reset-period").onclick = () => { $("db-from").value = ""; $("db-to").value = ""; renderDashboard(); };
   }
 
+  /* ---------- Chargement initial de l'historique embarqué ----------
+   * Au tout premier lancement (aucune donnée déjà enregistrée dans le
+   * navigateur), on charge l'historique fourni dans historique_seed.js.
+   * Une fois chargé, il est mémorisé localement : vos modifications
+   * ultérieures sont conservées et le seed n'écrase plus rien. */
+  function chargerSeedSiVide() {
+    if (state.ventes && state.ventes.length) return;
+    const seed = window.__HISTORIQUE_SEED__;
+    if (seed && Array.isArray(seed.ventes) && seed.ventes.length) {
+      state.ventes = seed.ventes;
+      state.compta = seed.compta || {};
+      save();
+    }
+  }
+
   /* ---------- Boot ---------- */
   document.addEventListener("DOMContentLoaded", () => {
-    initListes(); load(); bind(); refreshAll();
+    initListes(); load(); chargerSeedSiVide(); bind(); refreshAll();
   });
 })();

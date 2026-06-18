@@ -15,6 +15,19 @@ Aucune installation : ouvrez **`index.html`** dans un navigateur (Chrome, Edge,
 Firefox, Safari). Les données sont enregistrées **localement** dans le navigateur
 (localStorage) ; rien n'est envoyé sur Internet.
 
+**L'historique des ventes est pré-chargé** : au premier lancement, l'outil charge
+automatiquement les ventes embarquées dans `historique_seed.js` — elles
+apparaissent directement dans le tableau (onglet 2 · Ventes), sans réimport. Vos
+modifications sont ensuite conservées dans le navigateur. Le bouton « Tout
+effacer » remet l'historique d'origine au rechargement suivant.
+
+Pour régénérer l'historique embarqué après une mise à jour de l'Excel :
+
+```bash
+python3 import_excel.py "TABLEAU_MARGE_2026_POUR_TVA.xlsx" -o historique_ventes.json --enrich
+python3 build_seed.py
+```
+
 Fichiers :
 - `index.html` — interface
 - `styles.css` — mise en forme
