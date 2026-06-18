@@ -15,6 +15,13 @@ Aucune installation : ouvrez **`index.html`** dans un navigateur (Chrome, Edge,
 Firefox, Safari). Les données sont enregistrées **localement** dans le navigateur
 (localStorage) ; rien n'est envoyé sur Internet.
 
+> ⚠️ Ouvrez `index.html` depuis un dossier **décompressé** (pas directement depuis
+> l'intérieur du ZIP) : les fichiers `styles.css`, `app.js`, `regles.js` et
+> `historique_seed.js` doivent être à côté, sinon la page s'affiche sans mise en
+> forme ni données. Alternative sans risque : la **version tout-en-un**
+> `outil_tva_galerie.html` (`python3 build_html.py`), un fichier unique à ouvrir
+> où qu'il soit.
+
 **L'historique des ventes est pré-chargé** : au premier lancement, l'outil charge
 automatiquement les ventes embarquées dans `historique_seed.js` — elles
 apparaissent directement dans le tableau (onglet 2 · Ventes), sans réimport. Vos

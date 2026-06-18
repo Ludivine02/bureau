@@ -3,8 +3,9 @@
 ventes_tva.csv
 outil_tva_galerie.json
 
-# Artefact de distribution régénérable (zip du code déjà versionné)
+# Artefacts de distribution régénérables (code déjà versionné)
 outil_tva_galerie.zip
+outil_tva_galerie.html
 
 # Divers
 .DS_Store
