@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f5d62">
+<!-- Installable sur l'écran d'accueil iPhone/Android (Partager > Sur l'écran d'accueil) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Marge Galerie">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Simulateur Marge — Galerie</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root { --brand:#2f5d62; --brand-d:#244a4e; --bg:#eef2f2; --ink:#1f2530; --muted:#6b7280; --line:#dfe4e4; --ok:#1b5e20; --okbg:#e7f4e8; }
+  html,body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  header { background:var(--brand); color:#fff; padding:calc(env(safe-area-inset-top) + 14px) 16px 14px; position:sticky; top:0; z-index:5; }
+  header h1 { margin:0; font-size:18px; font-weight:600; }
+  header p { margin:2px 0 0; font-size:12px; opacity:.85; }
+  main { padding:16px; max-width:640px; margin:0 auto; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; box-shadow:0 1px 2px rgba(0,0,0,.05); }
+  label.f { display:block; margin-bottom:14px; }
+  label.f > span { display:block; font-size:13px; color:var(--muted); font-weight:600; margin-bottom:6px; }
+  input[type=number], select { width:100%; padding:14px; font-size:18px; border:1px solid var(--line); border-radius:10px; background:#fff; }
+  input:focus, select:focus { outline:2px solid var(--brand); outline-offset:-1px; }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; }
+  .chk { display:flex; align-items:center; gap:10px; margin-bottom:12px; font-size:14px; }
+  .chk input { width:22px; height:22px; }
+  .res-card { border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; background:#fff; }
+  .res-card.best { background:var(--okbg); border-color:#bfe0c2; }
+  .res-card .profil { font-size:14px; color:var(--muted); font-weight:600; }
+  .res-card .prix { font-size:30px; font-weight:800; color:var(--brand-d); margin:2px 0; }
+  .res-card .prix small { font-size:14px; font-weight:600; color:var(--muted); }
+  .res-card .meta { font-size:13px; color:var(--muted); margin-top:4px; }
+  .tag { display:inline-block; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; margin-top:6px; }
+  .EXPORT,.INTRACOM { background:#e8eef9; color:#1b3a72; }
+  .DC_55 { background:var(--okbg); color:var(--ok); }
+  .DC_20 { background:#fde9d9; color:#8a4b00; }
+  .MARGE { background:#e3eef0; color:var(--brand-d); }
+  .hint { font-size:12px; color:var(--muted); margin:6px 0 0; }
+  .note { font-size:12px; color:var(--muted); padding:10px; background:#f7f9f9; border-radius:10px; border-left:3px solid #b08968; }
+  .empty { text-align:center; color:var(--muted); padding:30px 10px; }
+  .badge-best { font-size:11px; background:var(--ok); color:#fff; padding:2px 8px; border-radius:10px; float:right; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Simulateur Marge — Galerie</h1>
+  <p>Prix à annoncer & marge optimisée selon l'acheteur · règles TVA 2025</p>
+</header>
+<main>
+  <div class="card">
+    <label class="f"><span>Coût d'acquisition de l'œuvre (€)</span>
+      <input id="cout" type="number" inputmode="decimal" placeholder="ex. 100000"></label>
+    <label class="f"><span>Marge nette visée</span>
+      <div class="row">
+        <input id="marge" type="number" inputmode="decimal" placeholder="ex. 50">
+        <select id="unite" style="max-width:42%"><option value="pct">% du coût</option><option value="eur">€</option></select>
+      </div></label>
+    <label class="chk"><input id="eligible" type="checkbox" checked><span>Œuvre achetée sans TVA → régime de la marge possible</span></label>
+    <label class="chk"><input id="ds" type="checkbox"><span>Revente d'un artiste éligible → droit de suite</span></label>
+    <label class="f"><span>Commission éventuelle (% du HT)</span>
+      <input id="commission" type="number" inputmode="decimal" placeholder="0"></label>
+  </div>
+  <div id="result"></div>
+  <p class="note">Régime retenu = celui qui maximise votre marge (particulier France/UE : arbitrage marge 20% / droit commun 5,5% — option 297 C). Prix <b>TTC</b> pour un particulier, <b>HT</b> pour un professionnel. Export hors UE et intracom (pro UE) exonérés. Indicatif — justificatifs export/intracom et 1ère cession (droit de suite) à confirmer.</p>
+</main>
+
+<script>
+/* ---- Règles (extrait autonome, aligné sur regles.js) ---- */
+var TAUX_REDUIT = 0.055, TAUX_MARGE = 0.20;
+var BAREME_DS = [[50000,0.04],[200000,0.03],[350000,0.01],[500000,0.005],[Infinity,0.0025]], PLAFOND_DS = 12500, SEUIL_DS = 750;
+function num(x){ if(x===""||x==null) return 0; var n=parseFloat(String(x).replace(/\s/g,"").replace(",",".")); return isNaN(n)?0:n; }
+function r2(x){ return Math.round((x+Number.EPSILON)*100)/100; }
+function baremeDS(prix){ if(prix<SEUIL_DS) return 0; var reste=prix,total=0,bb=0; for(var i=0;i<BAREME_DS.length;i++){ var pl=BAREME_DS[i][0],tx=BAREME_DS[i][1],larg=pl-bb,a=Math.max(0,Math.min(reste,larg)); total+=a*tx; reste-=a; bb=pl; if(reste<=0)break; } return Math.min(total,PLAFOND_DS); }
+
+function simuler(p){
+  var C=num(p.cout);
+  var M=(p.unite==="pct")?(num(p.marge)/100)*C:num(p.marge);
+  var comm=num(p.commission)/100, dsOn=!!p.ds, elig=!!p.eligible;
+  var profils=[
+    {key:"part_fr",label:"Particulier — France",zone:"FR",type:"particulier"},
+    {key:"part_ue",label:"Particulier — UE",zone:"UE",type:"particulier"},
+    {key:"pro_fr",label:"Professionnel — France",zone:"FR",type:"professionnel"},
+    {key:"pro_ue",label:"Professionnel — UE (intracom)",zone:"UE",type:"professionnel"},
+    {key:"export",label:"Client hors UE (export)",zone:"HUE",type:"particulier"}
+  ];
+  function tva(P,rg){ if(rg==="EXPORT"||rg==="INTRACOM")return 0; if(rg==="DC_55")return P*TAUX_REDUIT/(1+TAUX_REDUIT); if(rg==="MARGE"){var m=Math.max(0,P-C);return m*TAUX_MARGE/(1+TAUX_MARGE);} return 0; }
+  function net(P,zone,rg){ var v=tva(P,rg),ht=P-v,ds=(dsOn&&(zone==="FR"||zone==="UE"))?baremeDS(ht):0; return ht-C-comm*ht-ds; }
+  function prix(zone,rg){ var lo=0,hi=Math.max(C,1)*1000+Math.abs(M)*10+1e6; for(var i=0;i<80;i++){var mid=(lo+hi)/2; if(net(mid,zone,rg)<M)lo=mid;else hi=mid;} return (lo+hi)/2; }
+  var LBL={EXPORT:"Exportation exonérée",INTRACOM:"Livraison intracom exonérée",DC_55:"Droit commun 5,5%",DC_20:"Droit commun 20%",MARGE:"Régime de la marge"};
+  return profils.map(function(pr){
+    var regimes; if(pr.zone==="HUE")regimes=["EXPORT"]; else if(pr.zone==="UE"&&pr.type==="professionnel")regimes=["INTRACOM"]; else {regimes=["DC_55"]; if(elig)regimes.push("MARGE");}
+    var best=null,alt=null;
+    regimes.forEach(function(rg){var P=prix(pr.zone,rg); if(!best||P<best.P){alt=best;best={rg:rg,P:P};}else alt={rg:rg,P:P};});
+    var rg=best.rg,P=best.P,v=tva(P,rg),ht=P-v,ds=(dsOn&&(pr.zone==="FR"||pr.zone==="UE"))?baremeDS(ht):0;
+    return {label:pr.label,zone:pr.zone,type:pr.type,regime:LBL[rg],regimeCode:rg,
+      prixTTC:r2(P),prixHT:r2(ht),tva:r2(v),ds:r2(ds),
+      prixAnnonce:r2(pr.type==="professionnel"?ht:P),baseAnnonce:pr.type==="professionnel"?"HT":"TTC",
+      marge:r2(M), alternative:(alt&&regimes.length>1)?{regime:LBL[alt.rg],prixTTC:r2(alt.P)}:null};
+  });
+}
+function fmt0(n){ return Number(n).toLocaleString("fr-FR",{maximumFractionDigits:0}); }
+
+function render(){
+  var cout=num(document.getElementById("cout").value);
+  var box=document.getElementById("result");
+  if(!cout){ box.innerHTML='<div class="empty">Saisissez le coût de l\'œuvre pour lancer la simulation.</div>'; return; }
+  var p={cout:cout,marge:document.getElementById("marge").value,unite:document.getElementById("unite").value,
+    eligible:document.getElementById("eligible").checked,ds:document.getElementById("ds").checked,commission:document.getElementById("commission").value};
+  var res=simuler(p), min=Math.min.apply(null,res.map(function(r){return r.prixAnnonce;}));
+  box.innerHTML=res.map(function(r){
+    var best=Math.abs(r.prixAnnonce-min)<0.5;
+    return '<div class="res-card'+(best?' best':'')+'">'+
+      (best?'<span class="badge-best">prix le + bas</span>':'')+
+      '<div class="profil">'+r.label+'</div>'+
+      '<div class="prix">'+fmt0(r.prixAnnonce)+' € <small>'+r.baseAnnonce+'</small></div>'+
+      (r.baseAnnonce==="HT"&&r.tva>0?'<div class="meta">soit '+fmt0(r.prixTTC)+' € TTC</div>':'')+
+      '<span class="tag '+r.regimeCode+'">'+r.regime+'</span>'+
+      '<div class="meta">TVA : '+(r.tva>0?fmt0(r.tva)+' €':'exonérée')+(r.ds>0?' · droit de suite : '+fmt0(r.ds)+' €':'')+' · marge nette : <b>'+fmt0(r.marge)+' €</b></div>'+
+      (r.alternative?'<div class="meta">autre régime ('+r.alternative.regime+') : '+fmt0(r.alternative.prixTTC)+' € TTC</div>':'')+
+      '</div>';
+  }).join("");
+}
+["cout","marge","unite","eligible","ds","commission"].forEach(function(id){
+  var e=document.getElementById(id); e.addEventListener("input",render); e.addEventListener("change",render);
+});
+render();
+/* Service worker (hors-ligne) — actif uniquement quand l'appli est hébergée (http/https). */
+if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){
+  navigator.serviceWorker.register("service-worker.js").catch(function(){});
+}
+</script>
+</body>
+</html>

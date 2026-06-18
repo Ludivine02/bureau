@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#2f5d62"/>
+  <text x="50%" y="40%" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="150" font-weight="700" fill="#ffffff">€</text>
+  <text x="50%" y="68%" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="86" font-weight="700" fill="#b08968">%</text>
+</svg>
