@@ -103,13 +103,18 @@
     const ctrl = R.controlerLigne(v, tva);
     const venteTTC = R.num(v.venteTTC), achatTTC = R.num(v.achatTTC);
     const frais = R.num(v.fraisAccessoiresHT), commissions = R.num(v.commissions);
+    // Reprise FIDÈLE : on reprend le HT et la TVA RÉELLEMENT COMPTABILISÉS
+    // (colonnes "Ventes HT" / "TVA Collectée") quand ils existent ; le recalcul
+    // par régime (tva.tva) ne sert que de contrôle (onglet Cadrage).
+    const aHT = v.htCompta !== "" && v.htCompta != null;
+    const aTVA = v.tvaCompta !== "" && v.tvaCompta != null;
+    const tvaCollectee = aTVA ? R.num(v.tvaCompta) : tva.tva;
+    const venteHT = aHT ? R.num(v.htCompta) : R.r2(venteTTC - tva.tva);
     // Marge économique HT = Ventes HT - achats (stock + achats) - frais accessoires - commissions.
-    // Ventes HT = TTC - TVA collectée (cohérent quel que soit le régime).
-    const venteHT = R.r2(venteTTC - tva.tva);
     const marge = R.r2(venteHT - achatTTC - frais - commissions);
     const tauxMarge = venteHT ? marge / venteHT : 0;
     const alertes = [].concat(tva.alertes, ds.alertes, tf.alertes, ctrl);
-    return { tva, ds, tf, alertes, marge, tauxMarge, venteTTC, venteHT, achatTTC, frais, commissions };
+    return { tva, ds, tf, alertes, marge, tauxMarge, venteTTC, venteHT, tvaCollectee, achatTTC, frais, commissions };
   }
 
   /* =================================================================
@@ -297,7 +302,7 @@
       h += '<td class="num">' + fmt(r.frais) + '</td><td class="num">' + fmt(r.commissions) + '</td>';
       h += '<td class="num">' + fmt(r.marge) + '</td><td class="num">' + pct(r.tauxMarge) + '</td>';
       h += '<td><span class="tag ' + (r.tva.regime ? r.tva.regime.code : "") + '">' + esc(r.tva.regime ? r.tva.regime.label : "?") + '</span></td>';
-      h += '<td class="num">' + fmt(r.tva.tva) + '</td>';
+      h += '<td class="num">' + fmt(r.tvaCollectee) + '</td>';
       h += '<td class="num">' + (ecartTVA == null ? "" : '<span class="' + (Math.abs(ecartTVA) < 1 ? "ecart-ok" : "ecart-ko") + '">' + fmt(ecartTVA) + '</span>') + '</td>';
       h += '<td class="num">' + (r.ds.du ? fmt(r.ds.montant) : "—") + '</td>';
       h += '<td class="num">' + (r.tf.du ? fmt(r.tf.montant) : "—") + '</td>';
@@ -406,10 +411,19 @@
   /* =================================================================
    *  CADRAGE COMPTABLE
    * ================================================================= */
-  // CA HT "comptable" d'une vente (base imposable + part non imposable + montant exonéré).
-  function caHTComptable(t, v) {
-    const exo = t.regime && (t.regime.code === "EXPORT" || t.regime.code === "INTRACOM");
-    return t.baseHT + (t.partNonImposable || 0) + (exo ? R.num(v.venteTTC) : 0);
+  // Ventile le CA HT RÉELLEMENT COMPTABILISÉ (colonne "Ventes HT") d'une vente
+  // sur le compte du régime ; pour la marge, la part non imposable va sur 70713000.
+  function caVentilation(v, add) {
+    const t = R.calculerTVA(v);
+    const aHT = v.htCompta !== "" && v.htCompta != null;
+    const htTotal = aHT ? R.num(v.htCompta) : R.r2(R.num(v.venteTTC) - t.tva);
+    if (t.regime && t.regime.code === "MARGE") {
+      const ns = Math.min(t.partNonImposable || 0, htTotal);
+      add(t.compte || "—", t.libelleCompte, R.r2(htTotal - ns));
+      if (ns) add("70713000", "Ventes œuvres - CA non soumis", R.r2(ns));
+    } else {
+      add(t.compte || "—", t.libelleCompte, htTotal);
+    }
   }
   const soldeBG = (c) => R.num(state.balanceBG[c]);
   const ecartCell = (e) => '<span class="' + (Math.abs(e) < 1 ? "ecart-ok" : "ecart-ko") + '">' + fmt(e) + '</span>';
@@ -417,16 +431,10 @@
   function renderCadrage() {
     if (!state.ventes.length) { $("cadrage-table").innerHTML = '<div class="empty">Aucune donnée.</div>'; return; }
 
-    /* --- Volet A : CA classe 70 par compte --- */
+    /* --- Volet A : CA classe 70 par compte (HT RÉELLEMENT COMPTABILISÉ) --- */
     const caCpt = {};
     const add = (c, lib, ht) => { caCpt[c] = caCpt[c] || { libelle: lib || (R.PLAN_COMPTES[c] || ""), ht: 0 }; caCpt[c].ht += ht; };
-    state.ventes.forEach(v => {
-      const t = R.calculerTVA(v);
-      const exo = t.regime && (t.regime.code === "EXPORT" || t.regime.code === "INTRACOM");
-      // Base taxable (+ montant exonéré) sur le compte du régime ; part non imposable de la marge sur 70713000.
-      add(t.compte || "—", t.libelleCompte, t.baseHT + (exo ? R.num(v.venteTTC) : 0));
-      if (t.partNonImposable) add("70713000", "Ventes œuvres - CA non soumis", t.partNonImposable);
-    });
+    state.ventes.forEach(v => caVentilation(v, add));
     let hA = '<div class="table-wrap"><table><thead><tr><th>Compte</th><th>Libellé</th>' +
       '<th class="num">CA HT outil</th><th class="num">Solde BG (HT)</th><th class="num">Écart BG − outil</th></tr></thead><tbody>';
     let totO = 0, totB = 0;
@@ -525,7 +533,7 @@
     const vs = ventesFiltrees().map(v => ({ v, r: evaluer(v) }));
     let caTTC = 0, caHT = 0, achats = 0, marge = 0, tva = 0;
     vs.forEach(({ v, r }) => {
-      caTTC += r.venteTTC; achats += r.achatTTC; marge += r.marge; tva += r.tva.tva;
+      caTTC += r.venteTTC; achats += r.achatTTC; marge += r.marge; tva += r.tvaCollectee;
       caHT += r.venteHT;
     });
     const tauxMargeGlobal = caHT ? marge / caHT : 0;
@@ -865,7 +873,7 @@
     // --- Feuille Tableau de bord ---
     const vs = state.ventes.map(v => ({ v, r: evaluer(v) }));
     let caTTC = 0, caHT = 0, marge = 0, tva = 0;
-    vs.forEach(({ r }) => { caTTC += r.venteTTC; caHT += r.venteHT; marge += r.marge; tva += r.tva.tva; });
+    vs.forEach(({ r }) => { caTTC += r.venteTTC; caHT += r.venteHT; marge += r.marge; tva += r.tvaCollectee; });
     const rowsD = [
       [cT("TABLEAU DE BORD", 1)], [],
       [cT("Indicateur", 1), cT("Valeur", 1)],
@@ -921,12 +929,7 @@
     rows.push([cT("Compte", 1), cT("Libellé", 1), cT("CA HT outil", 1), cT("Solde BG (HT)", 1), cT("Écart BG − outil", 1)]);
     const caCpt = {};
     const addC = (c, lib, ht) => { caCpt[c] = caCpt[c] || { libelle: lib || (R.PLAN_COMPTES[c] || ""), ht: 0 }; caCpt[c].ht += ht; };
-    state.ventes.forEach(v => {
-      const t = R.calculerTVA(v);
-      const exo = t.regime && (t.regime.code === "EXPORT" || t.regime.code === "INTRACOM");
-      addC(t.compte || "—", t.libelleCompte, t.baseHT + (exo ? R.num(v.venteTTC) : 0));
-      if (t.partNonImposable) addC("70713000", "Ventes œuvres - CA non soumis", t.partNonImposable);
-    });
+    state.ventes.forEach(v => caVentilation(v, addC));
     let totO = 0, totB = 0;
     Object.keys(caCpt).sort().forEach(c => {
       const r = caCpt[c], bg = soldeBG(c); totO += r.ht; totB += bg;
