@@ -107,9 +107,8 @@ tfoot td { font-weight: 700; background: #eef2f2; border-top: 2px solid var(--br
 .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; }
 .dot.danger{background:var(--danger);} .dot.warn{background:#d9a300;} .dot.info{background:var(--info);} .dot.ok{background:var(--ok);}
 
-.vedit { padding: 4px 6px; font-size: 12px; border: 1px solid var(--line); border-radius: 6px; max-width: 130px; background:#fff; }
-.vedit.num { max-width: 95px; text-align: right; }
-table td:has(> .vedit) { background: #fff; }
+tr.clic { cursor: pointer; }
+tr.clic:hover td { background: #eef4f4; }
 
 .ecart-ok { color: var(--ok); font-weight: 600; }
 .ecart-ko { color: var(--danger); font-weight: 700; }

@@ -116,9 +116,12 @@
         <legend>Montants</legend>
         <div class="grid">
           <label class="fld"><span>Prix de vente TTC (€)</span><input id="f-venteTTC" type="number" step="0.01"></label>
-          <label class="fld"><span>Prix d'achat TTC (€) <small>(pour la marge)</small></span><input id="f-achatTTC" type="number" step="0.01"></label>
-          <label class="fld"><span>Frais accessoires HT (€)</span><input id="f-fraisAccessoiresHT" type="number" step="0.01"></label>
+          <label class="fld"><span>Valeur en stock (achat sur stock) (€)</span><input id="f-venteSurStock" type="number" step="0.01"></label>
+          <label class="fld"><span>Prix d'achat de l'année (€)</span><input id="f-achats2026" type="number" step="0.01"></label>
+          <label class="fld"><span>Frais accessoires (€)</span><input id="f-fraisAccessoiresHT" type="number" step="0.01"></label>
+          <label class="fld"><span>Commissions (€)</span><input id="f-commissions" type="number" step="0.01"></label>
         </div>
+        <div class="hint">Coût d'acquisition retenu pour la marge = valeur en stock + prix d'achat de l'année. La marge nette déduit en plus les frais accessoires et les commissions.</div>
       </fieldset>
 
       <fieldset>

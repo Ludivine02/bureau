@@ -143,8 +143,11 @@
       natureBien: $("f-natureBien").value,
       oeuvreOriginale: oui($("f-oeuvreOriginale").value),
       venteTTC: $("f-venteTTC").value,
-      achatTTC: $("f-achatTTC").value,
+      venteSurStock: $("f-venteSurStock").value,
+      achats2026: $("f-achats2026").value,
+      achatTTC: R.r2(R.num($("f-venteSurStock").value) + R.num($("f-achats2026").value)),
       fraisAccessoiresHT: $("f-fraisAccessoiresHT").value,
+      commissions: $("f-commissions").value,
       modeAcquisition: $("f-modeAcquisition").value,
       client: $("f-client").value,
       pays: $("f-pays").value,
@@ -178,8 +181,7 @@
   // Conserve les champs de référence (issus de l'import) non éditables dans le formulaire.
   function fusionnerReferences(nouvelle, ancienne) {
     if (!ancienne) return nouvelle;
-    ["commissions", "regimeSource", "exercice", "htCompta", "tvaCompta", "compteRef",
-      "venteSurStock", "achats2026", "margeBaseRef"].forEach(k => {
+    ["regimeSource", "exercice", "htCompta", "tvaCompta", "compteRef", "margeBaseRef"].forEach(k => {
       if (ancienne[k] != null && nouvelle[k] == null) nouvelle[k] = ancienne[k];
     });
     // Références DS / TF (base et montant repris)
@@ -201,8 +203,12 @@
     $("f-natureBien").value = v.natureBien || "oeuvre_art";
     setBool("f-oeuvreOriginale", v.oeuvreOriginale);
     $("f-venteTTC").value = v.venteTTC || "";
-    $("f-achatTTC").value = v.achatTTC || "";
+    // valeur en stock + prix d'achat de l'année (rétro-compatibilité : ancien achatTTC seul -> stock)
+    $("f-venteSurStock").value = (v.venteSurStock != null && v.venteSurStock !== "") ? v.venteSurStock
+      : ((v.achats2026 == null || v.achats2026 === "") && v.achatTTC ? v.achatTTC : "");
+    $("f-achats2026").value = v.achats2026 || "";
     $("f-fraisAccessoiresHT").value = v.fraisAccessoiresHT || "";
+    $("f-commissions").value = v.commissions || "";
     $("f-modeAcquisition").value = v.modeAcquisition || "";
     $("f-client").value = v.client || "";
     $("f-pays").value = v.pays || "";
@@ -268,29 +274,12 @@
   /* =================================================================
    *  TABLEAU DES VENTES
    * ================================================================= */
-  // Cellules éditables en ligne (correction directe dans la liste).
-  function vSel(v, champ, opts, def) {
-    const cur = v[champ] != null && v[champ] !== "" ? v[champ] : (def || "");
-    let s = '<select class="vedit" data-id="' + v.id + '" data-champ="' + champ + '">';
-    opts.forEach(o => s += '<option value="' + o[0] + '"' + (o[0] === cur ? " selected" : "") + '>' + esc(o[1]) + '</option>');
-    return s + '</select>';
-  }
-  function vNum(v, champ) {
-    return '<input class="vedit num" type="number" step="0.01" inputmode="decimal" data-id="' + v.id + '" data-champ="' + champ + '" value="' + esc(v[champ] == null ? "" : v[champ]) + '">';
-  }
-  function vTxt(v, champ, type) {
-    return '<input class="vedit" type="' + (type || "text") + '" data-id="' + v.id + '" data-champ="' + champ + '" value="' + esc(v[champ] == null ? "" : v[champ]) + '">';
-  }
-  const OPT_ZONE = [["FR", "France"], ["UE", "UE"], ["HUE", "Hors UE"]];
-  const OPT_CLIENT = [["particulier", "Particulier"], ["professionnel", "Profess."]];
-  const OPT_REGIME = [["", "(auto)"], ["EXPORT", "Export exo"], ["INTRACOM", "Intracom exo"], ["DC_55", "Dt commun 5,5%"], ["DC_20", "Dt commun 20%"], ["MARGE", "Marge"]];
-
   function renderVentes() {
     const wrap = $("ventes-table");
     if (!state.ventes.length) { wrap.innerHTML = '<div class="empty">Aucune vente. Saisissez-en une, chargez un jeu d\'exemple ou rechargez l\'historique d\'origine.</div>'; return; }
-    let h = '<p class="hint">Corrigez directement dans le tableau (les colonnes blanches sont modifiables) ; le calcul se met à jour aussitôt. « détails » ouvre la fiche complète (mode d\'acquisition, droit de suite, taxe forfaitaire).</p>';
+    let h = '<p class="hint">Cliquez sur une ligne pour ouvrir la fiche et corriger la vente.</p>';
     h += '<div class="table-wrap"><table><thead><tr>' +
-      '<th>Facture</th><th>Date</th><th>Artiste</th><th>Œuvre</th><th>Zone</th><th>Client</th><th>Régime saisi</th>' +
+      '<th>Facture</th><th>Date</th><th>Artiste</th><th>Œuvre</th><th>Zone</th><th>Client</th>' +
       '<th class="num">Vente TTC</th><th class="num">Achat</th><th class="num">Frais</th><th class="num">Comm.</th>' +
       '<th class="num">Marge HT</th><th class="num">% marge</th><th>Régime appliqué</th><th class="num">TVA</th><th class="num">Écart TVA</th>' +
       '<th class="num">DS</th><th class="num">TF</th><th>!</th><th></th></tr></thead><tbody>';
@@ -299,13 +288,13 @@
       const nbA = r.alertes.length, nbDanger = r.alertes.filter(a => a.niveau === "danger").length;
       const tvaRef = v.tvaCompta === "" || v.tvaCompta == null ? null : R.num(v.tvaCompta);
       const ecartTVA = tvaRef == null ? null : R.r2(r.tva.tva - tvaRef);
-      h += '<tr>';
-      h += '<td>' + vTxt(v, "numFacture") + '</td><td>' + vTxt(v, "dateFacture", "date") + '</td>';
-      h += '<td>' + vTxt(v, "artiste") + '</td><td>' + vTxt(v, "oeuvre") + '</td>';
-      h += '<td>' + vSel(v, "zone", OPT_ZONE, "FR") + '</td><td>' + vSel(v, "typeClient", OPT_CLIENT, "particulier") + '</td>';
-      h += '<td>' + vSel(v, "regimeChoisi", OPT_REGIME, "") + '</td>';
-      h += '<td>' + vNum(v, "venteTTC") + '</td><td>' + vNum(v, "achatTTC") + '</td>';
-      h += '<td>' + vNum(v, "fraisAccessoiresHT") + '</td><td>' + vNum(v, "commissions") + '</td>';
+      const zl = { FR: "France", UE: "UE", HUE: "Hors UE" }[v.zone] || esc(v.zone || "");
+      h += '<tr class="clic" data-edit="' + v.id + '" title="Cliquer pour corriger cette vente">';
+      h += '<td>' + esc(v.numFacture) + '</td><td>' + esc(v.dateFacture) + '</td>';
+      h += '<td>' + esc(v.artiste) + '</td><td>' + esc(v.oeuvre) + '</td>';
+      h += '<td>' + zl + '</td><td>' + esc(v.typeClient) + '</td>';
+      h += '<td class="num">' + fmt(r.venteTTC) + '</td><td class="num">' + fmt(r.achatTTC) + '</td>';
+      h += '<td class="num">' + fmt(r.frais) + '</td><td class="num">' + fmt(r.commissions) + '</td>';
       h += '<td class="num">' + fmt(r.marge) + '</td><td class="num">' + pct(r.tauxMarge) + '</td>';
       h += '<td><span class="tag ' + (r.tva.regime ? r.tva.regime.code : "") + '">' + esc(r.tva.regime ? r.tva.regime.label : "?") + '</span></td>';
       h += '<td class="num">' + fmt(r.tva.tva) + '</td>';
@@ -313,19 +302,13 @@
       h += '<td class="num">' + (r.ds.du ? fmt(r.ds.montant) : "—") + '</td>';
       h += '<td class="num">' + (r.tf.du ? fmt(r.tf.montant) : "—") + '</td>';
       h += '<td>' + (nbA ? '<span class="dot ' + (nbDanger ? "danger" : "warn") + '"></span>' + nbA : "") + '</td>';
-      h += '<td style="white-space:nowrap"><button class="btn small secondary" data-edit="' + v.id + '">détails</button> ' +
-        '<button class="btn small danger" data-del="' + v.id + '">×</button></td>';
+      h += '<td><button class="btn small danger" data-del="' + v.id + '">×</button></td>';
       h += '</tr>';
     });
     h += '</tbody></table></div>';
     wrap.innerHTML = h;
-    wrap.querySelectorAll(".vedit").forEach(elm => elm.onchange = () => {
-      const v = state.ventes.find(x => x.id === elm.getAttribute("data-id")); if (!v) return;
-      v[elm.getAttribute("data-champ")] = elm.value;
-      save(); refreshAll();
-    });
-    wrap.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => editVente(b.getAttribute("data-edit")));
-    wrap.querySelectorAll("[data-del]").forEach(b => b.onclick = () => delVente(b.getAttribute("data-del")));
+    wrap.querySelectorAll("tr.clic").forEach(tr => tr.onclick = () => editVente(tr.getAttribute("data-edit")));
+    wrap.querySelectorAll("[data-del]").forEach(b => b.onclick = (e) => { e.stopPropagation(); delVente(b.getAttribute("data-del")); });
   }
   function editVente(id) {
     const v = state.ventes.find(x => x.id === id); if (!v) return;
@@ -1126,7 +1109,7 @@
     };
     $("btn-evaluer").onclick = () => { $("live-result").style.display = "block"; $("live-result-body").innerHTML = renderAnalyse(lireFormulaire()); };
     $("btn-reset").onclick = resetFormulaire;
-    ["f-natureBien", "f-modeAcquisition", "f-zone", "f-typeClient", "f-venteTTC", "f-achatTTC", "f-regimeChoisi", "f-optionDroitCommun"].forEach(id => {
+    ["f-natureBien", "f-modeAcquisition", "f-zone", "f-typeClient", "f-venteTTC", "f-venteSurStock", "f-achats2026", "f-fraisAccessoiresHT", "f-commissions", "f-regimeChoisi", "f-optionDroitCommun"].forEach(id => {
       const e = $(id); if (e) e.addEventListener("change", () => { if ($("live-result").style.display !== "none") $("live-result-body").innerHTML = renderAnalyse(lireFormulaire()); });
     });
     $("btn-demo").onclick = demo;
