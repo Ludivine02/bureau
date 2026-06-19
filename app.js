@@ -419,11 +419,13 @@
 
     /* --- Volet A : CA classe 70 par compte --- */
     const caCpt = {};
+    const add = (c, lib, ht) => { caCpt[c] = caCpt[c] || { libelle: lib || (R.PLAN_COMPTES[c] || ""), ht: 0 }; caCpt[c].ht += ht; };
     state.ventes.forEach(v => {
       const t = R.calculerTVA(v);
-      const c = t.compte || "—";
-      caCpt[c] = caCpt[c] || { libelle: t.libelleCompte || "", ht: 0, tva: 0 };
-      caCpt[c].ht += caHTComptable(t, v); caCpt[c].tva += t.tva;
+      const exo = t.regime && (t.regime.code === "EXPORT" || t.regime.code === "INTRACOM");
+      // Base taxable (+ montant exonéré) sur le compte du régime ; part non imposable de la marge sur 70713000.
+      add(t.compte || "—", t.libelleCompte, t.baseHT + (exo ? R.num(v.venteTTC) : 0));
+      if (t.partNonImposable) add("70713000", "Ventes œuvres - CA non soumis", t.partNonImposable);
     });
     let hA = '<div class="table-wrap"><table><thead><tr><th>Compte</th><th>Libellé</th>' +
       '<th class="num">CA HT outil</th><th class="num">Solde BG (HT)</th><th class="num">Écart BG − outil</th></tr></thead><tbody>';
@@ -919,10 +921,12 @@
     rows.push([cT("A. Cadrage du CA par compte (classe 70, HT)", 1)]);
     rows.push([cT("Compte", 1), cT("Libellé", 1), cT("CA HT outil", 1), cT("Solde BG (HT)", 1), cT("Écart BG − outil", 1)]);
     const caCpt = {};
+    const addC = (c, lib, ht) => { caCpt[c] = caCpt[c] || { libelle: lib || (R.PLAN_COMPTES[c] || ""), ht: 0 }; caCpt[c].ht += ht; };
     state.ventes.forEach(v => {
-      const t = R.calculerTVA(v); const c = t.compte || "—";
-      caCpt[c] = caCpt[c] || { libelle: t.libelleCompte || "", ht: 0 };
-      caCpt[c].ht += caHTComptable(t, v);
+      const t = R.calculerTVA(v);
+      const exo = t.regime && (t.regime.code === "EXPORT" || t.regime.code === "INTRACOM");
+      addC(t.compte || "—", t.libelleCompte, t.baseHT + (exo ? R.num(v.venteTTC) : 0));
+      if (t.partNonImposable) addC("70713000", "Ventes œuvres - CA non soumis", t.partNonImposable);
     });
     let totO = 0, totB = 0;
     Object.keys(caCpt).sort().forEach(c => {
