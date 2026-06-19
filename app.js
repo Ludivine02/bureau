@@ -268,40 +268,62 @@
   /* =================================================================
    *  TABLEAU DES VENTES
    * ================================================================= */
+  // Cellules éditables en ligne (correction directe dans la liste).
+  function vSel(v, champ, opts, def) {
+    const cur = v[champ] != null && v[champ] !== "" ? v[champ] : (def || "");
+    let s = '<select class="vedit" data-id="' + v.id + '" data-champ="' + champ + '">';
+    opts.forEach(o => s += '<option value="' + o[0] + '"' + (o[0] === cur ? " selected" : "") + '>' + esc(o[1]) + '</option>');
+    return s + '</select>';
+  }
+  function vNum(v, champ) {
+    return '<input class="vedit num" type="number" step="0.01" inputmode="decimal" data-id="' + v.id + '" data-champ="' + champ + '" value="' + esc(v[champ] == null ? "" : v[champ]) + '">';
+  }
+  function vTxt(v, champ, type) {
+    return '<input class="vedit" type="' + (type || "text") + '" data-id="' + v.id + '" data-champ="' + champ + '" value="' + esc(v[champ] == null ? "" : v[champ]) + '">';
+  }
+  const OPT_ZONE = [["FR", "France"], ["UE", "UE"], ["HUE", "Hors UE"]];
+  const OPT_CLIENT = [["particulier", "Particulier"], ["professionnel", "Profess."]];
+  const OPT_REGIME = [["", "(auto)"], ["EXPORT", "Export exo"], ["INTRACOM", "Intracom exo"], ["DC_55", "Dt commun 5,5%"], ["DC_20", "Dt commun 20%"], ["MARGE", "Marge"]];
+
   function renderVentes() {
     const wrap = $("ventes-table");
-    if (!state.ventes.length) { wrap.innerHTML = '<div class="empty">Aucune vente. Saisissez-en une (onglet 1) ou chargez un jeu d\'exemple.</div>'; return; }
-    let h = '<div class="table-wrap"><table><thead><tr>' +
-      '<th>Ligne</th><th>Facture</th><th>Date</th><th>Artiste</th><th>Œuvre</th>' +
-      '<th class="num">Vente TTC</th><th class="num">Achat</th><th class="num">Frais</th><th class="num">Comm.</th><th class="num">Marge HT</th><th class="num">% marge</th>' +
-      '<th>Régime</th><th class="num">HT (réf. compta)</th><th class="num">TVA (réf. compta)</th>' +
-      '<th class="num">Base HT (outil)</th><th class="num">TVA (outil)</th><th class="num">Écart TVA</th><th>DS</th><th>TF</th><th>!</th><th></th></tr></thead><tbody>';
+    if (!state.ventes.length) { wrap.innerHTML = '<div class="empty">Aucune vente. Saisissez-en une, chargez un jeu d\'exemple ou rechargez l\'historique d\'origine.</div>'; return; }
+    let h = '<p class="hint">Corrigez directement dans le tableau (les colonnes blanches sont modifiables) ; le calcul se met à jour aussitôt. « détails » ouvre la fiche complète (mode d\'acquisition, droit de suite, taxe forfaitaire).</p>';
+    h += '<div class="table-wrap"><table><thead><tr>' +
+      '<th>Facture</th><th>Date</th><th>Artiste</th><th>Œuvre</th><th>Zone</th><th>Client</th><th>Régime saisi</th>' +
+      '<th class="num">Vente TTC</th><th class="num">Achat</th><th class="num">Frais</th><th class="num">Comm.</th>' +
+      '<th class="num">Marge HT</th><th class="num">% marge</th><th>Régime appliqué</th><th class="num">TVA</th><th class="num">Écart TVA</th>' +
+      '<th class="num">DS</th><th class="num">TF</th><th>!</th><th></th></tr></thead><tbody>';
     state.ventes.forEach(v => {
       const r = evaluer(v);
-      const nbA = r.alertes.length;
-      const nbDanger = r.alertes.filter(a => a.niveau === "danger").length;
-      const htRef = v.htCompta === "" || v.htCompta == null ? null : R.num(v.htCompta);
+      const nbA = r.alertes.length, nbDanger = r.alertes.filter(a => a.niveau === "danger").length;
       const tvaRef = v.tvaCompta === "" || v.tvaCompta == null ? null : R.num(v.tvaCompta);
       const ecartTVA = tvaRef == null ? null : R.r2(r.tva.tva - tvaRef);
       h += '<tr>';
-      h += '<td>' + esc(v.ligneCompta) + '</td><td>' + esc(v.numFacture) + '</td><td>' + esc(v.dateFacture) + '</td>';
-      h += '<td>' + esc(v.artiste) + '</td><td>' + esc(v.oeuvre) + '</td>';
-      h += '<td class="num">' + fmt(r.venteTTC) + '</td><td class="num">' + fmt(r.achatTTC) + '</td>';
-      h += '<td class="num">' + fmt(r.frais) + '</td><td class="num">' + fmt(r.commissions) + '</td>';
+      h += '<td>' + vTxt(v, "numFacture") + '</td><td>' + vTxt(v, "dateFacture", "date") + '</td>';
+      h += '<td>' + vTxt(v, "artiste") + '</td><td>' + vTxt(v, "oeuvre") + '</td>';
+      h += '<td>' + vSel(v, "zone", OPT_ZONE, "FR") + '</td><td>' + vSel(v, "typeClient", OPT_CLIENT, "particulier") + '</td>';
+      h += '<td>' + vSel(v, "regimeChoisi", OPT_REGIME, "") + '</td>';
+      h += '<td>' + vNum(v, "venteTTC") + '</td><td>' + vNum(v, "achatTTC") + '</td>';
+      h += '<td>' + vNum(v, "fraisAccessoiresHT") + '</td><td>' + vNum(v, "commissions") + '</td>';
       h += '<td class="num">' + fmt(r.marge) + '</td><td class="num">' + pct(r.tauxMarge) + '</td>';
       h += '<td><span class="tag ' + (r.tva.regime ? r.tva.regime.code : "") + '">' + esc(r.tva.regime ? r.tva.regime.label : "?") + '</span></td>';
-      h += '<td class="num">' + (htRef == null ? "—" : fmt(htRef)) + '</td><td class="num">' + (tvaRef == null ? "—" : fmt(tvaRef)) + '</td>';
-      h += '<td class="num">' + fmt(r.tva.baseHT) + '</td><td class="num">' + fmt(r.tva.tva) + '</td>';
+      h += '<td class="num">' + fmt(r.tva.tva) + '</td>';
       h += '<td class="num">' + (ecartTVA == null ? "" : '<span class="' + (Math.abs(ecartTVA) < 1 ? "ecart-ok" : "ecart-ko") + '">' + fmt(ecartTVA) + '</span>') + '</td>';
       h += '<td class="num">' + (r.ds.du ? fmt(r.ds.montant) : "—") + '</td>';
       h += '<td class="num">' + (r.tf.du ? fmt(r.tf.montant) : "—") + '</td>';
       h += '<td>' + (nbA ? '<span class="dot ' + (nbDanger ? "danger" : "warn") + '"></span>' + nbA : "") + '</td>';
-      h += '<td><button class="btn small secondary" data-edit="' + v.id + '">Éditer</button> ' +
+      h += '<td style="white-space:nowrap"><button class="btn small secondary" data-edit="' + v.id + '">détails</button> ' +
         '<button class="btn small danger" data-del="' + v.id + '">×</button></td>';
       h += '</tr>';
     });
     h += '</tbody></table></div>';
     wrap.innerHTML = h;
+    wrap.querySelectorAll(".vedit").forEach(elm => elm.onchange = () => {
+      const v = state.ventes.find(x => x.id === elm.getAttribute("data-id")); if (!v) return;
+      v[elm.getAttribute("data-champ")] = elm.value;
+      save(); refreshAll();
+    });
     wrap.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => editVente(b.getAttribute("data-edit")));
     wrap.querySelectorAll("[data-del]").forEach(b => b.onclick = () => delVente(b.getAttribute("data-del")));
   }
