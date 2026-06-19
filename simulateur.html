@@ -64,6 +64,7 @@
     <label class="chk"><input id="ds" type="checkbox"><span>Revente d'un artiste éligible → droit de suite</span></label>
     <label class="f"><span>Commission éventuelle (% du HT)</span>
       <input id="commission" type="number" inputmode="decimal" placeholder="0"></label>
+    <button id="btn-calc" type="button" style="width:100%;padding:14px;font-size:17px;font-weight:600;background:#2f5d62;color:#fff;border:0;border-radius:10px;margin-top:4px">Calculer</button>
   </div>
   <div id="result"></div>
   <p class="note">Régime retenu = celui qui maximise votre marge (particulier France/UE : arbitrage marge 20% / droit commun 5,5% — option 297 C). Prix <b>TTC</b> pour un particulier, <b>HT</b> pour un professionnel. Export hors UE et intracom (pro UE) exonérés. Indicatif — justificatifs export/intracom et 1ère cession (droit de suite) à confirmer.</p>
@@ -126,8 +127,10 @@ function render(){
   }).join("");
 }
 ["cout","marge","unite","eligible","ds","commission"].forEach(function(id){
-  var e=document.getElementById(id); e.addEventListener("input",render); e.addEventListener("change",render);
+  var e=document.getElementById(id); if(!e) return;
+  ["input","change","keyup"].forEach(function(ev){ e.addEventListener(ev,render); });
 });
+var bc=document.getElementById("btn-calc"); if(bc) bc.addEventListener("click",render);
 render();
 /* Service worker (hors-ligne) — actif uniquement quand l'appli est hébergée (http/https). */
 if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){
