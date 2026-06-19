@@ -40,17 +40,21 @@ COLS = {
 }
 
 UE = {"allemagne", "belgique", "espagne", "italie", "pays-bas", "luxembourg",
-      "portugal", "autriche", "irlande", "grèce", "pologne", "suède",
-      "danemark", "finlande", "tchéquie", "roumanie", "hongrie", "slovaquie",
-      "slovénie", "croatie", "bulgarie", "lituanie", "lettonie", "estonie",
+      "portugal", "autriche", "irlande", "grèce", "grece", "pologne", "suède", "suede",
+      "danemark", "finlande", "tchéquie", "tcheque", "tchèque", "république tchèque",
+      "republique tcheque", "roumanie", "hongrie", "slovaquie",
+      "slovénie", "slovenie", "croatie", "bulgarie", "lituanie", "lettonie", "estonie",
       "chypre", "malte"}
+
+# Territoires assimilés à la France pour la TVA
+FR_TVA = {"france", "monaco"}
 
 
 def deviner_zone(pays):
     if not pays:
         return "FR"
     p = str(pays).strip().lower()
-    if "france" in p:
+    if any(x in p for x in FR_TVA):
         return "FR"
     if any(x in p for x in UE):
         return "UE"

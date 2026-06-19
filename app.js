@@ -530,7 +530,6 @@
     });
     const tauxMargeGlobal = caHT ? marge / caHT : 0;
     $("db-kpi").innerHTML =
-      kpi(fmt0(caTTC) + " €", "Chiffre d'affaires (TTC)") +
       kpi(fmt0(caHT) + " €", "CA HT") +
       kpi(fmt0(marge) + " €", "Marge HT (nette de comm.)") +
       kpi(pct(tauxMargeGlobal), "Taux de marge moyen") +
@@ -1052,8 +1051,8 @@
   function devinerZone(pays) {
     if (!pays) return "FR";
     const p = pays.toLowerCase();
-    if (p.includes("france")) return "FR";
-    const ue = ["allemagne", "belgique", "espagne", "italie", "pays-bas", "luxembourg", "portugal", "autriche", "irlande", "grèce", "pologne", "suède", "danemark", "finlande"];
+    if (p.includes("france") || p.includes("monaco")) return "FR"; // Monaco = territoire TVA français
+    const ue = ["allemagne", "belgique", "espagne", "italie", "pays-bas", "luxembourg", "portugal", "autriche", "irlande", "grèce", "grece", "pologne", "suède", "suede", "danemark", "finlande", "tchèque", "tcheque", "tchéquie", "roumanie", "hongrie", "slovaquie", "slovénie", "slovenie", "croatie", "bulgarie", "lituanie", "lettonie", "estonie", "chypre", "malte"];
     if (ue.some(x => p.includes(x))) return "UE";
     return "HUE";
   }
