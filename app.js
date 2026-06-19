@@ -228,7 +228,10 @@
     setBool("f-tf-optionPlusValue", tf.optionPlusValue);
     $("f-tf-prixCession").value = tf.prixCession || "";
   }
-  function resetFormulaire() { $("form-vente").reset(); $("f-id").value = ""; $("live-result").style.display = "none"; }
+  function resetFormulaire() {
+    $("form-vente").reset(); $("f-id").value = ""; $("live-result").style.display = "none";
+    const t = $("saisie-titre"); if (t) t.textContent = "Saisie / correction d'une vente";
+  }
 
   /* ---------- Rendu d'une analyse (live) ---------- */
   function renderAnalyse(v) {
@@ -305,6 +308,7 @@
   function editVente(id) {
     const v = state.ventes.find(x => x.id === id); if (!v) return;
     ecrireFormulaire(v); switchView("saisie");
+    const t = $("saisie-titre"); if (t) t.textContent = "Correction — " + (v.oeuvre || v.numFacture || "vente");
     $("live-result").style.display = "block"; $("live-result-body").innerHTML = renderAnalyse(v);
     window.scrollTo(0, 0);
   }

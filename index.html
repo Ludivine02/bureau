@@ -26,6 +26,7 @@
 <nav class="tabs" id="tabs">
   <button data-view="simulateur" class="active">⚡ Simulateur</button>
   <button data-view="dashboard">Tableau de bord</button>
+  <button data-view="saisie">Saisie / correction</button>
   <button data-view="ventes">Ventes <span class="badge zero" id="badge-ventes">0</span></button>
   <button data-view="tva">Récap TVA (CA3)</button>
   <button data-view="ds">Droit de suite</button>
@@ -33,7 +34,6 @@
   <button data-view="cadrage">Cadrage compta</button>
   <button data-view="controles">Contrôles <span class="badge zero" id="badge-controles">0</span></button>
   <button data-view="artistes">Artistes</button>
-  <button data-view="saisie">Saisie détaillée</button>
 </nav>
 
 <main>
@@ -84,8 +84,8 @@
 <!-- ============ 1. SAISIE GUIDÉE ============ -->
 <section class="view" id="view-saisie">
   <div class="panel">
-    <h2>Saisie guidée d'une vente</h2>
-    <p class="lead">Répondez aux questions : l'outil détermine automatiquement le régime de TVA applicable, le droit de suite et la taxe forfaitaire éventuels, et signale les points à vérifier.</p>
+    <h2 id="saisie-titre">Saisie / correction d'une vente</h2>
+    <p class="lead">Répondez aux questions : l'outil détermine automatiquement le régime de TVA, le droit de suite et la taxe forfaitaire, et signale les points à vérifier. Pour <b>corriger</b> une vente existante, utilisez le bouton <b>« Éditer »</b> dans l'onglet <b>Ventes</b> (ou modifiez ci-dessous puis « Enregistrer »).</p>
 
     <form id="form-vente">
       <input type="hidden" id="f-id">
