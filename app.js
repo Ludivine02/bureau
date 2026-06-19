@@ -725,6 +725,188 @@
     const a = el("a", { href: URL.createObjectURL(blob), download: nom });
     document.body.appendChild(a); a.click(); a.remove();
   }
+
+  /* =================================================================
+   *  EXPORT EXCEL (.xlsx natif, sans librairie externe)
+   * ----------------------------------------------------------------- */
+  // --- mini-ZIP (méthode "stored", non compressé) ---
+  const _crcTable = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; }
+    return t;
+  })();
+  function crc32(bytes) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) c = _crcTable[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function zip(files) { // files: [{name, data:Uint8Array}]
+    const enc = new TextEncoder();
+    const chunks = [], central = []; let offset = 0;
+    const u16 = n => [n & 255, (n >>> 8) & 255];
+    const u32 = n => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+    files.forEach(f => {
+      const name = enc.encode(f.name), data = f.data, crc = crc32(data);
+      const lh = [].concat(u32(0x04034b50), u16(20), u16(0), u16(0), u16(0), u16(0),
+        u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0));
+      chunks.push(new Uint8Array(lh), name, data);
+      const cd = [].concat(u32(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0),
+        u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset));
+      central.push(new Uint8Array(cd), name);
+      offset += lh.length + name.length + data.length;
+    });
+    let cdSize = 0; central.forEach(c => cdSize += c.length);
+    const eocd = new Uint8Array([].concat(u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length), u32(cdSize), u32(offset), u16(0)));
+    const all = [].concat(chunks, central, [eocd]);
+    let total = 0; all.forEach(c => total += c.length);
+    const out = new Uint8Array(total); let p = 0;
+    all.forEach(c => { out.set(c, p); p += c.length; });
+    return out;
+  }
+  // --- OOXML ---
+  function colLetter(n) { let s = ""; n++; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; } return s; }
+  function escXml(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  // cellule : {v, t:'n'|'s', s:styleIndex}
+  function cellXml(ref, cell) {
+    if (cell == null || cell.v === "" || cell.v == null) return "";
+    const s = cell.s ? ' s="' + cell.s + '"' : "";
+    if (cell.t === "n") return '<c r="' + ref + '"' + s + '><v>' + cell.v + '</v></c>';
+    return '<c r="' + ref + '"' + s + ' t="inlineStr"><is><t xml:space="preserve">' + escXml(cell.v) + '</t></is></c>';
+  }
+  function sheetXml(rows) {
+    let sd = "";
+    rows.forEach((row, ri) => {
+      let rc = "";
+      row.forEach((cell, ci) => { rc += cellXml(colLetter(ci) + (ri + 1), cell); });
+      sd += '<row r="' + (ri + 1) + '">' + rc + '</row>';
+    });
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + sd + '</sheetData></worksheet>';
+  }
+  function classeurXlsx(feuilles) { // feuilles: [{nom, rows}]
+    const enc = new TextEncoder();
+    const styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>' +
+      '<fills count="1"><fill><patternFill patternType="none"/></fill></fills>' +
+      '<borders count="1"><border/></borders>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0"/></cellStyleXfs>' +
+      '<cellXfs count="4">' +
+      '<xf numFmtId="0" fontId="0"/>' +                                   // 0 défaut
+      '<xf numFmtId="0" fontId="1" applyFont="1"/>' +                     // 1 gras
+      '<xf numFmtId="4" fontId="0" applyNumberFormat="1"/>' +             // 2 #,##0.00
+      '<xf numFmtId="10" fontId="0" applyNumberFormat="1"/>' +            // 3 0.00%
+      '</cellXfs>' +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+      '</styleSheet>';
+    const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+      feuilles.map((f, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join("") +
+      '</Types>';
+    const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+    const wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      feuilles.map((f, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join("") +
+      '<Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>';
+    const workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+      feuilles.map((f, i) => '<sheet name="' + escXml(f.nom) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join("") +
+      '</sheets></workbook>';
+    const parts = [
+      { name: "[Content_Types].xml", data: enc.encode(contentTypes) },
+      { name: "_rels/.rels", data: enc.encode(rels) },
+      { name: "xl/workbook.xml", data: enc.encode(workbook) },
+      { name: "xl/_rels/workbook.xml.rels", data: enc.encode(wbRels) },
+      { name: "xl/styles.xml", data: enc.encode(styles) }
+    ];
+    feuilles.forEach((f, i) => parts.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: enc.encode(sheetXml(f.rows)) }));
+    return zip(parts);
+  }
+  // helpers cellules
+  const cT = (v, s) => ({ v: v, t: "s", s: s });           // texte
+  const cN = (v, s) => ({ v: R.r2(R.num(v)), t: "n", s: s || 2 }); // nombre (2 décimales)
+  const cP = (v) => ({ v: v, t: "n", s: 3 });              // pourcentage (fraction)
+
+  function exportXLSX() {
+    // --- Feuille Ventes ---
+    const head = ["Ligne", "Facture", "Date", "Artiste", "Œuvre", "Zone", "Type client", "Régime",
+      "Vente TTC", "Achat", "Frais", "Commissions", "Marge HT", "% marge", "Vente HT", "TVA (outil)",
+      "HT (réf. compta)", "TVA (réf. compta)", "Écart TVA", "Droit de suite", "Taxe forf.", "Compte"];
+    const rowsV = [head.map(h => cT(h, 1))];
+    state.ventes.forEach(v => {
+      const r = evaluer(v);
+      const tvaRef = (v.tvaCompta === "" || v.tvaCompta == null) ? null : R.num(v.tvaCompta);
+      const htRef = (v.htCompta === "" || v.htCompta == null) ? null : R.num(v.htCompta);
+      rowsV.push([
+        cT(v.ligneCompta), cT(v.numFacture), cT(v.dateFacture), cT(v.artiste), cT(v.oeuvre),
+        cT(v.zone), cT(v.typeClient), cT(r.tva.regime ? r.tva.regime.label : ""),
+        cN(r.venteTTC), cN(r.achatTTC), cN(r.frais), cN(r.commissions), cN(r.marge), cP(r.tauxMarge),
+        cN(r.venteHT), cN(r.tva.tva), htRef == null ? cT("") : cN(htRef), tvaRef == null ? cT("") : cN(tvaRef),
+        tvaRef == null ? cT("") : cN(r.tva.tva - tvaRef), cN(r.ds.du ? r.ds.montant : 0), cN(r.tf.du ? r.tf.montant : 0), cT(r.tva.compte || "")
+      ]);
+    });
+
+    // --- Feuille Tableau de bord ---
+    const vs = state.ventes.map(v => ({ v, r: evaluer(v) }));
+    let caTTC = 0, caHT = 0, marge = 0, tva = 0;
+    vs.forEach(({ r }) => { caTTC += r.venteTTC; caHT += r.venteHT; marge += r.marge; tva += r.tva.tva; });
+    const rowsD = [
+      [cT("TABLEAU DE BORD", 1)], [],
+      [cT("Indicateur", 1), cT("Valeur", 1)],
+      [cT("Chiffre d'affaires (TTC)"), cN(caTTC)],
+      [cT("CA HT"), cN(caHT)],
+      [cT("Marge HT (nette)"), cN(marge)],
+      [cT("Taux de marge moyen"), cP(caHT ? marge / caHT : 0)],
+      [cT("TVA collectée"), cN(tva)],
+      [cT("Nombre de ventes"), { v: vs.length, t: "n", s: 0 }],
+      []
+    ];
+    const top = (titre, arr, cols) => {
+      rowsD.push([cT(titre, 1)]);
+      rowsD.push(cols.map(c => cT(c, 1)));
+      arr.forEach(line => rowsD.push(line));
+      rowsD.push([]);
+    };
+    const parVente = vs.slice().sort((a, b) => b.r.venteTTC - a.r.venteTTC).slice(0, 10)
+      .map(x => [cT(x.v.oeuvre || x.v.numFacture), cT(x.v.artiste), cN(x.r.venteTTC), cN(x.r.marge), cP(x.r.tauxMarge)]);
+    top("Top 10 — plus grosses ventes", parVente, ["Œuvre", "Artiste", "Vente TTC", "Marge HT", "% marge"]);
+    const parTaux = vs.filter(x => x.r.venteHT > 0).sort((a, b) => b.r.tauxMarge - a.r.tauxMarge).slice(0, 10)
+      .map(x => [cT(x.v.oeuvre || x.v.numFacture), cT(x.v.artiste), cP(x.r.tauxMarge), cN(x.r.venteTTC), cN(x.r.marge)]);
+    top("Top 10 — plus gros taux de marge", parTaux, ["Œuvre", "Artiste", "% marge", "Vente TTC", "Marge HT"]);
+    const art = {};
+    vs.forEach(({ v, r }) => { const n = (v.artiste || "").trim() || "(non renseigné)"; art[n] = art[n] || { ca: 0, ht: 0, marge: 0, n: 0 }; art[n].ca += r.venteTTC; art[n].ht += r.venteHT; art[n].marge += r.marge; art[n].n++; });
+    const parArt = Object.keys(art).map(k => ({ nom: k, ...art[k] })).sort((a, b) => b.ca - a.ca).slice(0, 15)
+      .map(a => [cT(a.nom), { v: a.n, t: "n", s: 0 }, cN(a.ca), cN(a.marge), cP(a.ht ? a.marge / a.ht : 0)]);
+    top("Top artistes (CA & marge)", parArt, ["Artiste", "Nb", "CA TTC", "Marge HT", "% marge"]);
+    const reg = {};
+    vs.forEach(({ r }) => { const c = r.tva.regime ? r.tva.regime.label : "?"; reg[c] = reg[c] || { ca: 0, n: 0 }; reg[c].ca += r.venteTTC; reg[c].n++; });
+    const parReg = Object.keys(reg).sort((a, b) => reg[b].ca - reg[a].ca)
+      .map(k => [cT(k), { v: reg[k].n, t: "n", s: 0 }, cN(reg[k].ca), cP(caTTC ? reg[k].ca / caTTC : 0)]);
+    top("Répartition du CA par régime de TVA", parReg, ["Régime", "Nb", "CA TTC", "Part"]);
+
+    const data = classeurXlsx([{ nom: "Ventes", rows: rowsV }, { nom: "Tableau de bord", rows: rowsD }]);
+    const d = new Date().toISOString().slice(0, 10);
+    télécharger("outil_tva_galerie_" + d + ".xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  }
+
+  // Recharge l'historique d'origine embarqué (écrase les données courantes).
+  function rechargerHistorique() {
+    const seed = window.__HISTORIQUE_SEED__;
+    if (!seed || !Array.isArray(seed.ventes) || !seed.ventes.length) { alert("Aucun historique embarqué dans cette version."); return; }
+    if (!confirm("Recharger l'historique d'origine (" + seed.ventes.length + " ventes) ? Vos modifications en cours seront remplacées.")) return;
+    state.ventes = JSON.parse(JSON.stringify(seed.ventes));
+    state.compta = seed.compta || {};
+    state.balanceBG = seed.balanceBG || {};
+    state.artistes = {};
+    recenserArtistes();
+    save(); refreshAll(); switchView("ventes");
+  }
   function importerFichier(file) {
     const reader = new FileReader();
     reader.onload = () => {
@@ -867,9 +1049,11 @@
       const e = $(id); if (e) e.addEventListener("change", () => { if ($("live-result").style.display !== "none") $("live-result-body").innerHTML = renderAnalyse(lireFormulaire()); });
     });
     $("btn-demo").onclick = demo;
+    $("btn-reload-seed").onclick = rechargerHistorique;
     $("btn-clear").onclick = () => { if (confirm("Effacer toutes les ventes ?")) { state.ventes = []; state.compta = {}; save(); refreshAll(); } };
     $("btn-export-json").onclick = exportJSON;
     $("btn-export-csv").onclick = exportCSV;
+    $("btn-export-xlsx").onclick = exportXLSX;
     $("btn-print").onclick = () => window.print();
     $("btn-import").onclick = () => $("file-input").click();
     $("file-input").onchange = (e) => { if (e.target.files[0]) importerFichier(e.target.files[0]); e.target.value = ""; };
