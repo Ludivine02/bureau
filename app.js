@@ -890,9 +890,64 @@
       .map(k => [cT(k), { v: reg[k].n, t: "n", s: 0 }, cN(reg[k].ca), cP(caTTC ? reg[k].ca / caTTC : 0)]);
     top("Répartition du CA par régime de TVA", parReg, ["Régime", "Nb", "CA TTC", "Part"]);
 
-    const data = classeurXlsx([{ nom: "Ventes", rows: rowsV }, { nom: "Tableau de bord", rows: rowsD }]);
+    // --- Feuille Cadrage compta (3 volets) ---
+    const rowsC = construireCadrageRows();
+
+    const data = classeurXlsx([
+      { nom: "Ventes", rows: rowsV },
+      { nom: "Tableau de bord", rows: rowsD },
+      { nom: "Cadrage compta", rows: rowsC }
+    ]);
     const d = new Date().toISOString().slice(0, 10);
     télécharger("outil_tva_galerie_" + d + ".xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  }
+
+  // Construit les lignes de la feuille « Cadrage compta » (3 volets), alignées sur l'onglet Cadrage.
+  function construireCadrageRows() {
+    const rows = [[cT("CADRAGE AVEC LA BALANCE GÉNÉRALE", 1)], []];
+
+    // A. CA par compte (classe 70)
+    rows.push([cT("A. Cadrage du CA par compte (classe 70, HT)", 1)]);
+    rows.push([cT("Compte", 1), cT("Libellé", 1), cT("CA HT outil", 1), cT("Solde BG (HT)", 1), cT("Écart BG − outil", 1)]);
+    const caCpt = {};
+    state.ventes.forEach(v => {
+      const t = R.calculerTVA(v); const c = t.compte || "—";
+      caCpt[c] = caCpt[c] || { libelle: t.libelleCompte || "", ht: 0 };
+      caCpt[c].ht += caHTComptable(t, v);
+    });
+    let totO = 0, totB = 0;
+    Object.keys(caCpt).sort().forEach(c => {
+      const r = caCpt[c], bg = soldeBG(c); totO += r.ht; totB += bg;
+      rows.push([cT(c), cT(r.libelle), cN(r.ht), cN(bg), cN(bg - r.ht)]);
+    });
+    rows.push([cT("TOTAL classe 70", 1), cT(""), cN(totO), cN(totB), cN(totB - totO)]);
+    rows.push([]);
+
+    // B. TVA collectée
+    rows.push([cT("B. Cadrage de la TVA collectée", 1)]);
+    rows.push([cT("Indicateur", 1), cT("Montant", 1)]);
+    let tvaO = 0; state.ventes.forEach(v => tvaO += R.calculerTVA(v).tva);
+    const tvaB = R.CADRAGE.tvaCollectee.reduce((s, c) => s + soldeBG(c), 0);
+    rows.push([cT("TVA collectée outil (toutes lignes)"), cN(tvaO)]);
+    rows.push([cT("TVA collectée Balance (44571*)"), cN(tvaB)]);
+    rows.push([cT("Écart BG − outil", 1), cN(tvaB - tvaO)]);
+    rows.push([]);
+
+    // C. Achats & coûts (classe 6)
+    rows.push([cT("C. Cadrage des achats & coûts (classe 6)", 1)]);
+    rows.push([cT("Poste", 1), cT("Comptes BG", 1), cT("Outil", 1), cT("Balance", 1), cT("Écart BG − outil", 1)]);
+    const som = { achat: 0, frais: 0, commissions: 0, ds: 0, tf: 0 };
+    state.ventes.forEach(v => {
+      const vr = appliquerReferentiel(v);
+      som.achat += R.num(v.achatTTC); som.frais += R.num(v.fraisAccessoiresHT); som.commissions += R.num(v.commissions);
+      const ds = R.calculerDroitDeSuite(vr); if (ds.du) som.ds += ds.montant;
+      const tf = R.calculerTaxeForfaitaire(vr); if (tf.du) som.tf += tf.montant;
+    });
+    R.CADRAGE.achats.forEach(g => {
+      const o = som[g.cle], b = Math.abs(g.comptes.reduce((s, c) => s + soldeBG(c), 0));
+      rows.push([cT(g.label), cT(g.comptes.join(", ")), cN(o), cN(b), cN(b - o)]);
+    });
+    return rows;
   }
 
   // Recharge l'historique d'origine embarqué (écrase les données courantes).
