@@ -593,19 +593,20 @@
     const caN1 = sumHT(state.ventes.filter(v => !estFAE(v) && estPCA(v)));
     const faeArr = state.ventes.filter(v => estFAE(v));
     const caFAE = sumHT(faeArr);
-    const caTotal = caHT + caN1 + caFAE;
+    // CA total = exercice + N-1 (classe 70). La FAE est un poste de BILAN (418), hors CA.
+    const caTotal = caHT + caN1;
     const exo = R.PARAMS.exerciceCourant;
     $("db-kpi").innerHTML =
       kpi(fmt0(caHT) + " €", "CA HT exercice (" + exo + ")") +
       kpi(fmt0(caN1) + " €", "CA HT antérieur (N-1)") +
-      kpi(fmt0(caTotal) + " €", "CA HT total") +
+      kpi(fmt0(caTotal) + " €", "CA HT total (classe 70)") +
       kpi(fmt0(marge) + " €", "Marge HT exercice (nette)") +
       kpi(pct(tauxMargeGlobal), "Taux de marge moyen") +
       kpi(fmt0(tva) + " €", "TVA collectée exercice") +
       kpi(vs.length, "Nb ventes exercice");
     if (caN1 || faeArr.length) {
       $("db-kpi").innerHTML += '<div class="kpi" style="background:#f7f9f9"><div class="l" style="margin-bottom:4px">Détail hors exercice (onglet Cut-off)</div>' +
-        '<div style="font-size:13px">N-1 (PCA) : <b>' + fmt0(caN1) + ' €</b><br>FAE (bilan) : <b>' + fmt0(caFAE) + ' €</b> (' + faeArr.length + ')</div></div>';
+        '<div style="font-size:13px">dont N-1 (PCA) : <b>' + fmt0(caN1) + ' €</b><br>FAE hors CA (bilan 418) : <b>' + fmt0(caFAE) + ' €</b> (' + faeArr.length + ')</div></div>';
     }
 
     // Top ventes
