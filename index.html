@@ -28,6 +28,7 @@
   <button data-view="dashboard">Tableau de bord</button>
   <button data-view="saisie">Saisie / correction</button>
   <button data-view="ventes">Ventes <span class="badge zero" id="badge-ventes">0</span></button>
+  <button data-view="cutoff">Cut-off / N-1 <span class="badge zero" id="badge-cutoff">0</span></button>
   <button data-view="tva">Récap TVA (CA3)</button>
   <button data-view="ds">Droit de suite</button>
   <button data-view="tf">Taxe forfaitaire</button>
@@ -162,6 +163,7 @@
             <option value="MARGE">Régime de la marge</option>
             <option value="MARGE_FORFAITAIRE">Marge forfaitaire 30% (ancien régime)</option>
           </select></label>
+        <label class="fld" style="display:flex;align-items:center;gap:8px"><input id="f-fae" type="checkbox" style="width:auto"><span style="margin:0">Facture à établir (FAE) — poste de bilan, <b>hors CA</b> (onglet Cut-off)</span></label>
       </fieldset>
 
       <fieldset>
@@ -233,6 +235,15 @@
       <button class="btn danger small" id="btn-clear">Tout effacer</button>
     </div>
     <div id="ventes-table"></div>
+  </div>
+</section>
+
+<!-- ============ CUT-OFF / N-1 ============ -->
+<section class="view" id="view-cutoff">
+  <div class="panel">
+    <h2>Cut-off &amp; factures à établir <span style="font-size:13px;color:var(--muted)">(hors CA de l'exercice)</span></h2>
+    <p class="lead">Lignes rattachées à l'exercice antérieur (<b>PCA / cut-off N-1</b>) et <b>factures à établir (FAE)</b>, séparées des ventes de l'année. Elles n'entrent pas dans le CA ni le tableau de bord, mais restent prises en compte dans le <b>cadrage comptable</b> (comptes de cut-off 70709xxx). Cliquez une ligne pour la corriger.</p>
+    <div id="cutoff-table"></div>
   </div>
 </section>
 
