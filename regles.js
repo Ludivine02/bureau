@@ -388,18 +388,18 @@ const REGLES = (function () {
   }
 
   /* --- Mode 2 : AIDE À LA NÉGOCIATION — marge finale sur un TTC négocié ---
-   * params : { coutHT, margeEligible, dsEligible, acquereur ('particulier'|'professionnel'),
-   *            lieu ('FR'|'CEE'|'MONACO'|'EXPORT'), transport (€), prixTTCnego } */
+   * params : { coutHT, margeEligible, dsEligible, acquereur, lieu ('FR'|'CEE'|'MONACO'|'EXPORT'),
+   *            transport (€), commissionValeur, commissionUnite ('eur'|'pct'), prixTTCnego } */
   function simulerNegociation(p) {
     const C = num(p.coutHT), transport = num(p.transport), ttc = num(p.prixTTCnego);
     const lieu = p.lieu, acq = p.acquereur;
     const margeEligible = !!p.margeEligible, dsEligible = !!p.dsEligible;
+    const commVal = num(p.commissionValeur), commPct = p.commissionUnite === "pct";
 
-    // Territorialité : Monaco assimilé à la France ; CEE = UE.
     let exo = false, regimeFixe = null;
     if (lieu === "EXPORT") { exo = true; regimeFixe = "EXPORT"; }
     else if (lieu === "CEE" && acq === "professionnel") { exo = true; regimeFixe = "INTRACOM"; }
-    const dsDansLeChamp = dsEligible && lieu !== "EXPORT"; // hors champ à l'export (pratique galerie)
+    const dsDansLeChamp = dsEligible && lieu !== "EXPORT";
 
     function calc(rg) {
       let tva = 0;
@@ -407,15 +407,15 @@ const REGLES = (function () {
       else if (rg === "MARGE") tva = Math.max(0, ttc - C) * PARAMS.tva.tauxMargeUnique / (1 + PARAMS.tva.tauxMargeUnique);
       const ht = ttc - tva;
       const ds = dsDansLeChamp ? baremeDroitDeSuite(ht) : 0;
-      const marge = ht - C - transport - ds;
+      const commission = commPct ? ht * commVal / 100 : commVal;
+      const marge = ht - C - transport - ds - commission;
       return {
         regimeCode: rg, regime: LISTES.regimes[rg] ? LISTES.regimes[rg].label : rg,
-        tva: r2(tva), ht: r2(ht), ds: r2(ds), transport: r2(transport), ttc: r2(ttc),
+        tva: r2(tva), ht: r2(ht), ds: r2(ds), commission: r2(commission), transport: r2(transport), ttc: r2(ttc),
         marge: r2(marge), tauxMarge: ht ? marge / ht : 0
       };
     }
     if (exo) return calc(regimeFixe);
-    // Taxable (France / Monaco / CEE particulier) : meilleur régime au TTC donné.
     const cands = margeEligible ? ["DC_55", "MARGE"] : ["DC_55"];
     let best = null, alt = null;
     cands.forEach(rg => { const r = calc(rg); if (!best || r.marge > best.marge) { alt = best; best = r; } else alt = r; });

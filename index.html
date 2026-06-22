@@ -43,43 +43,62 @@
 <section class="view active" id="view-simulateur">
   <div class="panel">
     <h2>Simulateur</h2>
-    <p class="lead">Deux outils : <b>1. Asking</b> (prix de vente HT à demander) et <b>2. Aide à la négociation</b> (marge finale selon l'offre du client). Renseignez d'abord l'œuvre, commune aux deux.</p>
-    <fieldset>
-      <legend>L'œuvre (commun aux deux simulations)</legend>
-      <div class="grid wide">
-        <label class="fld"><span>Coût d'acquisition HT de l'œuvre (€)</span><input id="sim-cout" type="number" step="0.01" inputmode="decimal" placeholder="ex. 100000"></label>
-        <label class="fld"><span>Œuvre achetée à…</span>
-          <select id="sim-achat-aupres"><option value="particulier">un particulier</option><option value="professionnel">un professionnel</option></select></label>
-        <label class="fld"><span>L'acquisition a-t-elle donné droit à récupération de TVA ?</span>
-          <select id="sim-tva-recup"><option value="non">Non (→ régime de la marge possible)</option><option value="oui">Oui (→ droit commun)</option></select></label>
-        <label class="fld"><span>Vente d'un artiste éligible au droit de suite ?</span>
-          <select id="sim-ds-eligible"><option value="non">Non</option><option value="oui">Oui</option></select></label>
-      </div>
-    </fieldset>
+    <p class="lead">Deux outils : <b>1. Asking</b> (prix de vente HT à demander) et <b>2. Aide à la négociation</b> (marge finale selon l'offre du client). Les données de l'œuvre saisies dans l'Asking sont reprises dans la négociation.</p>
   </div>
 
   <div class="grid wide">
+    <!-- ===== 1. ASKING ===== -->
     <div class="panel">
-      <h3>1 · Asking — prix de vente HT à demander</h3>
-      <label class="fld"><span>Taux de marge attendu (sur le prix de vente HT) %</span><input id="sim-taux" type="number" step="0.1" inputmode="decimal" placeholder="ex. 40"></label>
-      <div id="asking-result"></div>
+      <h3>1 · Asking — prix de vente HT espéré</h3>
+      <fieldset>
+        <legend>Informations à renseigner</legend>
+        <label class="fld"><span>Coût d'acquisition HT de l'œuvre (€)</span><input id="sim-cout" type="number" step="0.01" inputmode="decimal" placeholder="ex. 100000"></label>
+        <label class="fld"><span>Qualité du vendeur (cédant)</span>
+          <select id="sim-achat-aupres"><option value="particulier">Particulier</option><option value="professionnel">Professionnel</option></select></label>
+        <label class="fld"><span>TVA récupérable sur l'acquisition ?</span>
+          <select id="sim-tva-recup"><option value="non">Non (→ régime de la marge possible)</option><option value="oui">Oui (→ droit commun)</option></select></label>
+        <label class="fld"><span>Artiste éligible au droit de suite ?</span>
+          <select id="sim-ds-eligible"><option value="non">Non</option><option value="oui">Oui</option></select></label>
+        <label class="fld"><span>Taux de marge attendu (sur le prix de vente HT) %</span><input id="sim-taux" type="number" step="0.1" inputmode="decimal" placeholder="ex. 40"></label>
+      </fieldset>
+      <fieldset>
+        <legend>Résultat — prix de vente espéré</legend>
+        <div id="asking-result"></div>
+      </fieldset>
     </div>
 
+    <!-- ===== 2. NÉGOCIATION ===== -->
     <div class="panel">
       <h3>2 · Aide à la négociation — marge finale</h3>
-      <div class="grid">
-        <label class="fld"><span>Qualité de l'acquéreur</span>
-          <select id="sim-acquereur"><option value="particulier">Particulier</option><option value="professionnel">Professionnel</option></select></label>
-        <label class="fld"><span>Lieu de livraison de l'œuvre</span>
-          <select id="sim-lieu"><option value="FR">France</option><option value="CEE">CEE (UE)</option><option value="MONACO">Monaco</option><option value="EXPORT">Export (hors UE)</option></select></label>
-        <label class="fld"><span>Frais de transport (€)</span><input id="sim-transport" type="number" step="0.01" inputmode="decimal" placeholder="0"></label>
-        <label class="fld"><span>Prix TTC négocié par le client (€)</span><input id="sim-ttc-nego" type="number" step="0.01" inputmode="decimal" placeholder="ex. 150000"></label>
-      </div>
-      <div id="nego-result"></div>
+      <fieldset>
+        <legend>Rappel de l'œuvre (repris de l'Asking)</legend>
+        <div id="nego-rappel" class="hint">Renseignez d'abord l'Asking.</div>
+      </fieldset>
+      <fieldset>
+        <legend>Informations à renseigner</legend>
+        <div class="grid">
+          <label class="fld"><span>Qualité de l'acquéreur</span>
+            <select id="sim-acquereur"><option value="particulier">Particulier</option><option value="professionnel">Professionnel</option></select></label>
+          <label class="fld"><span>Lieu de livraison de l'œuvre</span>
+            <select id="sim-lieu"><option value="FR">France</option><option value="CEE">CEE (UE)</option><option value="MONACO">Monaco</option><option value="EXPORT">Export (hors UE)</option></select></label>
+          <label class="fld"><span>Frais de transport (€)</span><input id="sim-transport" type="number" step="0.01" inputmode="decimal" placeholder="0"></label>
+          <label class="fld"><span>Commission à rétrocéder</span>
+            <div style="display:flex;gap:6px"><input id="sim-commission" type="number" step="0.01" inputmode="decimal" placeholder="0" style="flex:1">
+            <select id="sim-commission-unite" style="max-width:90px"><option value="eur">€</option><option value="pct">% HT</option></select></div></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Prix TTC négocié par le client</legend>
+        <label class="fld"><span>Prix TTC négocié (€)</span><input id="sim-ttc-nego" type="number" step="0.01" inputmode="decimal" placeholder="ex. 150000"></label>
+      </fieldset>
+      <fieldset>
+        <legend>Résultats de la proposition du client</legend>
+        <div id="nego-result"></div>
+      </fieldset>
     </div>
   </div>
 
-  <div class="panel"><div class="disclaimer">Marge finale = Prix HT réalisé − coût d'acquisition − frais de transport − droit de suite. Pour un particulier France/UE éligible à la marge, l'outil retient le régime le plus avantageux (marge 20% ou droit commun 5,5% — option 297 C). Monaco est assimilé à la France ; export hors UE et livraison intracom (pro UE) sont exonérés. Indicatif — justificatifs et 1ère cession à confirmer.</div></div>
+  <div class="panel"><div class="disclaimer">Marge nette HT = Prix HT réalisé − coût d'acquisition − transport − droit de suite − commission. Particulier France/UE éligible : régime le plus avantageux (marge 20% ou droit commun 5,5% — option 297 C). Monaco assimilé à la France ; export hors UE et livraison intracom (pro UE) exonérés. Indicatif — justificatifs et 1ère cession à confirmer.</div></div>
 </section>
 
 <!-- ============ 0. TABLEAU DE BORD ============ -->

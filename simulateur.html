@@ -48,7 +48,7 @@
   <div class="card">
     <h2>L'œuvre (commun aux deux)</h2>
     <label class="f"><span>Coût d'acquisition HT (€)</span><input id="cout" type="number" inputmode="decimal" placeholder="ex. 100000"></label>
-    <label class="f"><span>Œuvre achetée à…</span><select id="achat"><option value="particulier">un particulier</option><option value="professionnel">un professionnel</option></select></label>
+    <label class="f"><span>Qualité du vendeur (cédant)</span><select id="achat"><option value="particulier">Particulier</option><option value="professionnel">Professionnel</option></select></label>
     <label class="f"><span>Récupération de TVA à l'achat ?</span><select id="tvarecup"><option value="non">Non (marge possible)</option><option value="oui">Oui (droit commun)</option></select></label>
     <label class="f"><span>Artiste éligible au droit de suite ?</span><select id="dseli"><option value="non">Non</option><option value="oui">Oui</option></select></label>
   </div>
@@ -68,6 +68,8 @@
       <label class="f"><span>Qualité de l'acquéreur</span><select id="acq"><option value="particulier">Particulier</option><option value="professionnel">Professionnel</option></select></label>
       <label class="f"><span>Lieu de livraison</span><select id="lieu"><option value="FR">France</option><option value="CEE">CEE (UE)</option><option value="MONACO">Monaco</option><option value="EXPORT">Export (hors UE)</option></select></label>
       <label class="f"><span>Frais de transport (€)</span><input id="transport" type="number" inputmode="decimal" placeholder="0"></label>
+      <label class="f"><span>Commission à rétrocéder</span>
+        <span style="display:flex;gap:6px"><input id="commission" type="number" inputmode="decimal" placeholder="0" style="flex:1"><select id="commu" style="max-width:90px"><option value="eur">€</option><option value="pct">% HT</option></select></span></label>
       <label class="f"><span>Prix TTC négocié par le client (€)</span><input id="ttcnego" type="number" inputmode="decimal" placeholder="ex. 150000"></label>
       <button class="btn" id="calc2" type="button">Calculer la marge</button>
     </div>
@@ -91,40 +93,44 @@ function asking(){
   var o=oeuvre(), taux=num(v("taux"))/100, box=document.getElementById("res1");
   if(!o.C||!taux){box.innerHTML='<div class="res empty">Saisissez le coût et le taux de marge.</div>';return;}
   var pv=(taux<1)?r2(o.C/(1-taux)):0, marge=r2(pv-o.C), ds=o.dsElig?r2(baremeDS(pv)):0;
-  var h='<div class="res"><div class="lbl">Prix de vente HT espéré</div><div class="big">'+f0(pv)+' €</div>'+
-    '<div class="line"><span>Marge HT</span><b>'+f0(marge)+' €</b></div>'+
+  var h='<div class="res">'+
+    '<div class="line" style="border-top:0"><span>Coût de revient HT</span><b>'+f0(o.C)+' €</b></div>'+
+    '<div class="line"><span>+ Marge HT ('+pct(taux)+')</span><b>'+f0(marge)+' €</b></div>'+
+    '<div class="lbl" style="margin-top:8px">= Prix de vente HT espéré</div><div class="big">'+f0(pv)+' €</div>'+
     '<div class="line"><span>Régime probable</span><b>'+(o.margeElig?"Marge":"Droit commun 5,5%")+'</b></div>'+
     '<div class="line"><span>Prix TTC indicatif (France 5,5%)</span><b>'+f0(r2(pv*(1+TR)))+' €</b></div>';
-  if(o.dsElig) h+='<div class="line"><span>Droit de suite estimé</span><b>'+f0(ds)+' €</b></div><div class="line"><span>Marge HT après droit de suite</span><b>'+f0(r2(marge-ds))+' €</b></div>';
+  if(o.dsElig) h+='<div class="line"><span>Droit de suite estimé</span><b>'+f0(ds)+' €</b></div>';
   box.innerHTML=h+'</div>';
 }
 function nego(){
   var o=oeuvre(), ttc=num(v("ttcnego")), transport=num(v("transport")), lieu=v("lieu"), acq=v("acq"), box=document.getElementById("res2");
+  var commVal=num(v("commission")), commPct=v("commu")==="pct";
   if(!o.C||!ttc){box.innerHTML='<div class="res empty">Saisissez le coût et le prix TTC négocié.</div>';return;}
   var exo=false,fixe=null;
   if(lieu==="EXPORT"){exo=true;fixe="EXPORT";} else if(lieu==="CEE"&&acq==="professionnel"){exo=true;fixe="INTRACOM";}
   var dsOk=o.dsElig&&lieu!=="EXPORT";
   function calc(rg){var tva=0; if(rg==="DC_55")tva=ttc*TR/(1+TR); else if(rg==="MARGE")tva=Math.max(0,ttc-o.C)*TM/(1+TM);
-    var ht=ttc-tva, ds=dsOk?baremeDS(ht):0, m=ht-o.C-transport-ds;
-    return {rg:rg,tva:r2(tva),ht:r2(ht),ds:r2(ds),m:r2(m),tx:ht?m/ht:0};}
+    var ht=ttc-tva, ds=dsOk?baremeDS(ht):0, comm=commPct?ht*commVal/100:commVal, m=ht-o.C-transport-ds-comm;
+    return {rg:rg,tva:r2(tva),ht:r2(ht),ds:r2(ds),comm:r2(comm),m:r2(m),tx:ht?m/ht:0};}
   var best,alt=null;
   if(exo){best=calc(fixe);} else {var cands=o.margeElig?["DC_55","MARGE"]:["DC_55"]; cands.forEach(function(rg){var r=calc(rg); if(!best||r.m>best.m){alt=best;best=r;}else alt=r;});}
-  var h='<div class="res"><div class="lbl">Marge finale sur la vente</div><div class="big'+(best.m<0?' ko':'')+'">'+f0(best.m)+' €</div>'+
-    '<span class="tag '+best.rg+'">'+LBL[best.rg]+'</span> <span style="font-size:13px;color:var(--muted)">taux '+pct(best.tx)+'</span>'+
-    '<div class="line"><span>Prix TTC négocié</span><b>'+f0(ttc)+' €</b></div>'+
-    '<div class="line"><span>TVA</span><b>'+(best.tva>0?f0(best.tva)+' €':'exonérée')+'</b></div>'+
-    '<div class="line"><span>Prix HT réalisé</span><b>'+f0(best.ht)+' €</b></div>'+
-    '<div class="line"><span>− Coût d\'acquisition</span><b>'+f0(o.C)+' €</b></div>'+
-    (transport?'<div class="line"><span>− Transport</span><b>'+f0(transport)+' €</b></div>':'')+
-    (best.ds?'<div class="line"><span>− Droit de suite</span><b>'+f0(best.ds)+' €</b></div>':'')+'</div>';
-  if(alt&&!exo&&o.margeElig) h+='<div class="note">Autre régime ('+LBL[alt.rg]+') : marge '+f0(alt.m)+' €.</div>';
+  var h='<div class="res">'+
+    '<div class="line" style="border-top:0"><span>Prix TTC négocié</span><b>'+f0(ttc)+' €</b></div>'+
+    '<div class="line"><span>TVA à reverser <span class="tag '+best.rg+'">'+LBL[best.rg]+'</span></span><b>'+(best.tva>0?f0(best.tva)+' €':'exonérée')+'</b></div>'+
+    '<div class="line"><span>= Prix HT réalisé</span><b>'+f0(best.ht)+' €</b></div>'+
+    '<div class="line"><span>− Coût d\'acquisition HT</span><b>'+f0(o.C)+' €</b></div>'+
+    '<div class="line"><span>− Droit de suite à reverser</span><b>'+f0(best.ds)+' €</b></div>'+
+    '<div class="line"><span>− Commission HT à rétrocéder</span><b>'+f0(best.comm)+' €</b></div>'+
+    '<div class="line"><span>− Transport</span><b>'+f0(transport)+' €</b></div>'+
+    '<div class="lbl" style="margin-top:8px">= Marge nette HT</div><div class="big'+(best.m<0?' ko':'')+'">'+f0(best.m)+' € <span style="font-size:14px;color:var(--muted)">('+pct(best.tx)+')</span></div></div>';
+  if(alt&&!exo&&o.margeElig) h+='<div class="note">Régime le plus avantageux retenu. Autre option ('+LBL[alt.rg]+') : marge '+f0(alt.m)+' €.</div>';
   var taux=num(v("taux"));
   if(taux){var pv=r2(o.C/(1-taux/100)), askMarge=r2(pv-o.C-(o.dsElig?baremeDS(pv):0)), diff=r2(best.m-askMarge);
     h+='<div class="note">Objectif (asking) : marge '+f0(askMarge)+' € — '+(diff>=0?'au-dessus de +'+f0(diff)+' €':'en dessous de '+f0(diff)+' €')+'.</div>';}
   box.innerHTML=h;
 }
 function render(){asking();nego();}
-["cout","achat","tvarecup","dseli","taux","acq","lieu","transport","ttcnego"].forEach(function(id){
+["cout","achat","tvarecup","dseli","taux","acq","lieu","transport","commission","commu","ttcnego"].forEach(function(id){
   var e=document.getElementById(id); if(!e)return; ["input","change","keyup"].forEach(function(ev){e.addEventListener(ev,render);});
 });
 document.getElementById("calc1").addEventListener("click",render);
