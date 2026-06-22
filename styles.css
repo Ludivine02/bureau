@@ -107,6 +107,15 @@ tfoot td { font-weight: 700; background: #eef2f2; border-top: 2px solid var(--br
 .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; }
 .dot.danger{background:var(--danger);} .dot.warn{background:#d9a300;} .dot.info{background:var(--info);} .dot.ok{background:var(--ok);}
 
+/* Cadres bien distincts du simulateur */
+#view-simulateur fieldset { border: 2px solid var(--brand); border-radius: 12px; padding: 16px 14px 6px; margin: 0 0 18px; background: #fdfefe; }
+#view-simulateur legend { background: var(--brand); color: #fff; font-weight: 700; padding: 5px 14px; border-radius: 8px; font-size: 13px; }
+#view-simulateur fieldset.accent { border-color: var(--accent); background: #fbf7f3; }
+#view-simulateur fieldset.accent legend { background: var(--accent); }
+#view-simulateur fieldset.resultat { border-color: var(--brand-d); }
+#view-simulateur fieldset.resultat legend { background: var(--brand-d); }
+#view-simulateur .panel > h3 { font-size: 16px; background: #eef2f2; border-radius: 8px; padding: 8px 12px; }
+
 tr.clic { cursor: pointer; }
 tr.clic:hover td { background: #eef4f4; }
 
