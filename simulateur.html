@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2f5d62">
-<!-- Installable sur l'écran d'accueil iPhone/Android (Partager > Sur l'écran d'accueil) -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Marge Galerie">
@@ -13,129 +12,129 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>Simulateur Marge — Galerie</title>
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  :root { --brand:#2f5d62; --brand-d:#244a4e; --bg:#eef2f2; --ink:#1f2530; --muted:#6b7280; --line:#dfe4e4; --ok:#1b5e20; --okbg:#e7f4e8; }
-  html,body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
-  header { background:var(--brand); color:#fff; padding:calc(env(safe-area-inset-top) + 14px) 16px 14px; position:sticky; top:0; z-index:5; }
-  header h1 { margin:0; font-size:18px; font-weight:600; }
-  header p { margin:2px 0 0; font-size:12px; opacity:.85; }
-  main { padding:16px; max-width:640px; margin:0 auto; }
-  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; box-shadow:0 1px 2px rgba(0,0,0,.05); }
-  label.f { display:block; margin-bottom:14px; }
-  label.f > span { display:block; font-size:13px; color:var(--muted); font-weight:600; margin-bottom:6px; }
-  input[type=number], select { width:100%; padding:14px; font-size:18px; border:1px solid var(--line); border-radius:10px; background:#fff; }
-  input:focus, select:focus { outline:2px solid var(--brand); outline-offset:-1px; }
-  .row { display:flex; gap:8px; }
-  .row > * { flex:1; }
-  .chk { display:flex; align-items:center; gap:10px; margin-bottom:12px; font-size:14px; }
-  .chk input { width:22px; height:22px; }
-  .res-card { border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; background:#fff; }
-  .res-card.best { background:var(--okbg); border-color:#bfe0c2; }
-  .res-card .profil { font-size:14px; color:var(--muted); font-weight:600; }
-  .res-card .prix { font-size:30px; font-weight:800; color:var(--brand-d); margin:2px 0; }
-  .res-card .prix small { font-size:14px; font-weight:600; color:var(--muted); }
-  .res-card .meta { font-size:13px; color:var(--muted); margin-top:4px; }
-  .tag { display:inline-block; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; margin-top:6px; }
-  .EXPORT,.INTRACOM { background:#e8eef9; color:#1b3a72; }
-  .DC_55 { background:var(--okbg); color:var(--ok); }
-  .DC_20 { background:#fde9d9; color:#8a4b00; }
-  .MARGE { background:#e3eef0; color:var(--brand-d); }
-  .hint { font-size:12px; color:var(--muted); margin:6px 0 0; }
-  .note { font-size:12px; color:var(--muted); padding:10px; background:#f7f9f9; border-radius:10px; border-left:3px solid #b08968; }
-  .empty { text-align:center; color:var(--muted); padding:30px 10px; }
-  .badge-best { font-size:11px; background:var(--ok); color:#fff; padding:2px 8px; border-radius:10px; float:right; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  :root{--brand:#2f5d62;--brand-d:#244a4e;--bg:#eef2f2;--ink:#1f2530;--muted:#6b7280;--line:#dfe4e4;--ok:#1b5e20;--okbg:#e7f4e8;--danger:#b3261e;--accent:#b08968;}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  header{background:var(--brand);color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;position:sticky;top:0;z-index:5;}
+  header h1{margin:0;font-size:17px;font-weight:600;}
+  .tabs{display:flex;gap:6px;margin-top:10px;}
+  .tabs button{flex:1;background:rgba(255,255,255,.14);color:#fff;border:0;padding:9px;border-radius:8px;font-size:13px;font-weight:600;}
+  .tabs button.on{background:#fff;color:var(--brand-d);}
+  main{padding:14px;max-width:640px;margin:0 auto;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.05);}
+  .card h2{font-size:14px;margin:0 0 10px;color:var(--brand-d);}
+  label.f{display:block;margin-bottom:11px;}
+  label.f>span{display:block;font-size:13px;color:var(--muted);font-weight:600;margin-bottom:5px;}
+  input,select{width:100%;padding:12px;font-size:17px;border:1px solid var(--line);border-radius:10px;background:#fff;}
+  .btn{width:100%;padding:14px;font-size:17px;font-weight:600;background:var(--brand);color:#fff;border:0;border-radius:10px;margin-top:4px;}
+  .pane{display:none;} .pane.on{display:block;}
+  .res{border:1px solid var(--line);border-radius:14px;padding:14px;background:#fff;margin-top:4px;}
+  .res .lbl{font-size:13px;color:var(--muted);font-weight:600;}
+  .res .big{font-size:30px;font-weight:800;color:var(--brand-d);margin:2px 0 8px;}
+  .res .big.ko{color:var(--danger);}
+  .line{display:flex;justify-content:space-between;font-size:14px;padding:4px 0;border-top:1px solid #f0f3f3;}
+  .tag{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;}
+  .EXPORT,.INTRACOM{background:#e8eef9;color:#1b3a72;}.DC_55{background:var(--okbg);color:var(--ok);}.DC_20{background:#fde9d9;color:#8a4b00;}.MARGE{background:#e3eef0;color:var(--brand-d);}
+  .note{font-size:12px;color:var(--muted);padding:10px;background:#f7f9f9;border-radius:10px;border-left:3px solid var(--accent);margin-top:8px;}
+  .empty{color:var(--muted);text-align:center;padding:18px;}
 </style>
 </head>
 <body>
 <header>
   <h1>Simulateur Marge — Galerie</h1>
-  <p>Prix à annoncer & marge optimisée selon l'acheteur · règles TVA 2025</p>
+  <div class="tabs"><button id="t1" class="on" type="button">1 · Asking</button><button id="t2" type="button">2 · Négociation</button></div>
 </header>
 <main>
   <div class="card">
-    <label class="f"><span>Coût d'acquisition de l'œuvre (€)</span>
-      <input id="cout" type="number" inputmode="decimal" placeholder="ex. 100000"></label>
-    <label class="f"><span>Marge nette visée</span>
-      <div class="row">
-        <input id="marge" type="number" inputmode="decimal" placeholder="ex. 50">
-        <select id="unite" style="max-width:42%"><option value="pct">% du coût</option><option value="eur">€</option></select>
-      </div></label>
-    <label class="chk"><input id="eligible" type="checkbox" checked><span>Œuvre achetée sans TVA → régime de la marge possible</span></label>
-    <label class="chk"><input id="ds" type="checkbox"><span>Revente d'un artiste éligible → droit de suite</span></label>
-    <label class="f"><span>Commission éventuelle (% du HT)</span>
-      <input id="commission" type="number" inputmode="decimal" placeholder="0"></label>
-    <button id="btn-calc" type="button" style="width:100%;padding:14px;font-size:17px;font-weight:600;background:#2f5d62;color:#fff;border:0;border-radius:10px;margin-top:4px">Calculer</button>
+    <h2>L'œuvre (commun aux deux)</h2>
+    <label class="f"><span>Coût d'acquisition HT (€)</span><input id="cout" type="number" inputmode="decimal" placeholder="ex. 100000"></label>
+    <label class="f"><span>Œuvre achetée à…</span><select id="achat"><option value="particulier">un particulier</option><option value="professionnel">un professionnel</option></select></label>
+    <label class="f"><span>Récupération de TVA à l'achat ?</span><select id="tvarecup"><option value="non">Non (marge possible)</option><option value="oui">Oui (droit commun)</option></select></label>
+    <label class="f"><span>Artiste éligible au droit de suite ?</span><select id="dseli"><option value="non">Non</option><option value="oui">Oui</option></select></label>
   </div>
-  <div id="result"></div>
-  <p class="note">Régime retenu = celui qui maximise votre marge (particulier France/UE : arbitrage marge 20% / droit commun 5,5% — option 297 C). Prix <b>TTC</b> pour un particulier, <b>HT</b> pour un professionnel. Export hors UE et intracom (pro UE) exonérés. Indicatif — justificatifs export/intracom et 1ère cession (droit de suite) à confirmer.</p>
+
+  <div class="pane on" id="pane1">
+    <div class="card">
+      <h2>1 · Asking — prix de vente HT à demander</h2>
+      <label class="f"><span>Taux de marge attendu (sur le PV HT) %</span><input id="taux" type="number" inputmode="decimal" placeholder="ex. 40"></label>
+      <button class="btn" id="calc1" type="button">Calculer le prix</button>
+    </div>
+    <div id="res1"></div>
+  </div>
+
+  <div class="pane" id="pane2">
+    <div class="card">
+      <h2>2 · Aide à la négociation — marge finale</h2>
+      <label class="f"><span>Qualité de l'acquéreur</span><select id="acq"><option value="particulier">Particulier</option><option value="professionnel">Professionnel</option></select></label>
+      <label class="f"><span>Lieu de livraison</span><select id="lieu"><option value="FR">France</option><option value="CEE">CEE (UE)</option><option value="MONACO">Monaco</option><option value="EXPORT">Export (hors UE)</option></select></label>
+      <label class="f"><span>Frais de transport (€)</span><input id="transport" type="number" inputmode="decimal" placeholder="0"></label>
+      <label class="f"><span>Prix TTC négocié par le client (€)</span><input id="ttcnego" type="number" inputmode="decimal" placeholder="ex. 150000"></label>
+      <button class="btn" id="calc2" type="button">Calculer la marge</button>
+    </div>
+    <div id="res2"></div>
+  </div>
+  <p class="note">Marge finale = prix HT réalisé − coût d'acquisition − transport − droit de suite. Particulier France/UE éligible : régime le plus avantageux (marge 20% ou 5,5% — option 297 C). Monaco = France ; export & intracom (pro UE) exonérés. Indicatif.</p>
 </main>
 
 <script>
-/* ---- Règles (extrait autonome, aligné sur regles.js) ---- */
-var TAUX_REDUIT = 0.055, TAUX_MARGE = 0.20;
-var BAREME_DS = [[50000,0.04],[200000,0.03],[350000,0.01],[500000,0.005],[Infinity,0.0025]], PLAFOND_DS = 12500, SEUIL_DS = 750;
-function num(x){ if(x===""||x==null) return 0; var n=parseFloat(String(x).replace(/\s/g,"").replace(",",".")); return isNaN(n)?0:n; }
-function r2(x){ return Math.round((x+Number.EPSILON)*100)/100; }
-function baremeDS(prix){ if(prix<SEUIL_DS) return 0; var reste=prix,total=0,bb=0; for(var i=0;i<BAREME_DS.length;i++){ var pl=BAREME_DS[i][0],tx=BAREME_DS[i][1],larg=pl-bb,a=Math.max(0,Math.min(reste,larg)); total+=a*tx; reste-=a; bb=pl; if(reste<=0)break; } return Math.min(total,PLAFOND_DS); }
+var TR=0.055, TM=0.20, BAR=[[50000,.04],[200000,.03],[350000,.01],[500000,.005],[Infinity,.0025]], PLAF=12500, SEUIL=750;
+function num(x){if(x===""||x==null)return 0;var n=parseFloat(String(x).replace(/\s/g,"").replace(",","."));return isNaN(n)?0:n;}
+function r2(x){return Math.round((x+Number.EPSILON)*100)/100;}
+function f0(n){return Number(n).toLocaleString("fr-FR",{maximumFractionDigits:0});}
+function pct(n){return (n*100).toLocaleString("fr-FR",{maximumFractionDigits:1})+" %";}
+function baremeDS(p){if(p<SEUIL)return 0;var reste=p,t=0,bb=0;for(var i=0;i<BAR.length;i++){var pl=BAR[i][0],tx=BAR[i][1],a=Math.max(0,Math.min(reste,pl-bb));t+=a*tx;reste-=a;bb=pl;if(reste<=0)break;}return Math.min(t,PLAF);}
+function oeuvre(){return {C:num(v("cout")), margeElig:v("tvarecup")!=="oui", dsElig:v("dseli")==="oui"};}
+function v(id){return document.getElementById(id).value;}
+var LBL={EXPORT:"Exportation exonérée",INTRACOM:"Livraison intracom exonérée",DC_55:"Droit commun 5,5%",MARGE:"Régime de la marge"};
 
-function simuler(p){
-  var C=num(p.cout);
-  var M=(p.unite==="pct")?(num(p.marge)/100)*C:num(p.marge);
-  var comm=num(p.commission)/100, dsOn=!!p.ds, elig=!!p.eligible;
-  var profils=[
-    {key:"part_fr",label:"Particulier — France",zone:"FR",type:"particulier"},
-    {key:"part_ue",label:"Particulier — UE",zone:"UE",type:"particulier"},
-    {key:"pro_fr",label:"Professionnel — France",zone:"FR",type:"professionnel"},
-    {key:"pro_ue",label:"Professionnel — UE (intracom)",zone:"UE",type:"professionnel"},
-    {key:"export",label:"Client hors UE (export)",zone:"HUE",type:"particulier"}
-  ];
-  function tva(P,rg){ if(rg==="EXPORT"||rg==="INTRACOM")return 0; if(rg==="DC_55")return P*TAUX_REDUIT/(1+TAUX_REDUIT); if(rg==="MARGE"){var m=Math.max(0,P-C);return m*TAUX_MARGE/(1+TAUX_MARGE);} return 0; }
-  function net(P,zone,rg){ var v=tva(P,rg),ht=P-v,ds=(dsOn&&(zone==="FR"||zone==="UE"))?baremeDS(ht):0; return ht-C-comm*ht-ds; }
-  function prix(zone,rg){ var lo=0,hi=Math.max(C,1)*1000+Math.abs(M)*10+1e6; for(var i=0;i<80;i++){var mid=(lo+hi)/2; if(net(mid,zone,rg)<M)lo=mid;else hi=mid;} return (lo+hi)/2; }
-  var LBL={EXPORT:"Exportation exonérée",INTRACOM:"Livraison intracom exonérée",DC_55:"Droit commun 5,5%",DC_20:"Droit commun 20%",MARGE:"Régime de la marge"};
-  return profils.map(function(pr){
-    var regimes; if(pr.zone==="HUE")regimes=["EXPORT"]; else if(pr.zone==="UE"&&pr.type==="professionnel")regimes=["INTRACOM"]; else {regimes=["DC_55"]; if(elig)regimes.push("MARGE");}
-    var best=null,alt=null;
-    regimes.forEach(function(rg){var P=prix(pr.zone,rg); if(!best||P<best.P){alt=best;best={rg:rg,P:P};}else alt={rg:rg,P:P};});
-    var rg=best.rg,P=best.P,v=tva(P,rg),ht=P-v,ds=(dsOn&&(pr.zone==="FR"||pr.zone==="UE"))?baremeDS(ht):0;
-    return {label:pr.label,zone:pr.zone,type:pr.type,regime:LBL[rg],regimeCode:rg,
-      prixTTC:r2(P),prixHT:r2(ht),tva:r2(v),ds:r2(ds),
-      prixAnnonce:r2(pr.type==="professionnel"?ht:P),baseAnnonce:pr.type==="professionnel"?"HT":"TTC",
-      marge:r2(M), alternative:(alt&&regimes.length>1)?{regime:LBL[alt.rg],prixTTC:r2(alt.P)}:null};
-  });
+function asking(){
+  var o=oeuvre(), taux=num(v("taux"))/100, box=document.getElementById("res1");
+  if(!o.C||!taux){box.innerHTML='<div class="res empty">Saisissez le coût et le taux de marge.</div>';return;}
+  var pv=(taux<1)?r2(o.C/(1-taux)):0, marge=r2(pv-o.C), ds=o.dsElig?r2(baremeDS(pv)):0;
+  var h='<div class="res"><div class="lbl">Prix de vente HT espéré</div><div class="big">'+f0(pv)+' €</div>'+
+    '<div class="line"><span>Marge HT</span><b>'+f0(marge)+' €</b></div>'+
+    '<div class="line"><span>Régime probable</span><b>'+(o.margeElig?"Marge":"Droit commun 5,5%")+'</b></div>'+
+    '<div class="line"><span>Prix TTC indicatif (France 5,5%)</span><b>'+f0(r2(pv*(1+TR)))+' €</b></div>';
+  if(o.dsElig) h+='<div class="line"><span>Droit de suite estimé</span><b>'+f0(ds)+' €</b></div><div class="line"><span>Marge HT après droit de suite</span><b>'+f0(r2(marge-ds))+' €</b></div>';
+  box.innerHTML=h+'</div>';
 }
-function fmt0(n){ return Number(n).toLocaleString("fr-FR",{maximumFractionDigits:0}); }
-
-function render(){
-  var cout=num(document.getElementById("cout").value);
-  var box=document.getElementById("result");
-  if(!cout){ box.innerHTML='<div class="empty">Saisissez le coût de l\'œuvre pour lancer la simulation.</div>'; return; }
-  var p={cout:cout,marge:document.getElementById("marge").value,unite:document.getElementById("unite").value,
-    eligible:document.getElementById("eligible").checked,ds:document.getElementById("ds").checked,commission:document.getElementById("commission").value};
-  var res=simuler(p), min=Math.min.apply(null,res.map(function(r){return r.prixAnnonce;}));
-  box.innerHTML=res.map(function(r){
-    var best=Math.abs(r.prixAnnonce-min)<0.5;
-    return '<div class="res-card'+(best?' best':'')+'">'+
-      (best?'<span class="badge-best">prix le + bas</span>':'')+
-      '<div class="profil">'+r.label+'</div>'+
-      '<div class="prix">'+fmt0(r.prixAnnonce)+' € <small>'+r.baseAnnonce+'</small></div>'+
-      (r.baseAnnonce==="HT"&&r.tva>0?'<div class="meta">soit '+fmt0(r.prixTTC)+' € TTC</div>':'')+
-      '<span class="tag '+r.regimeCode+'">'+r.regime+'</span>'+
-      '<div class="meta">TVA : '+(r.tva>0?fmt0(r.tva)+' €':'exonérée')+(r.ds>0?' · droit de suite : '+fmt0(r.ds)+' €':'')+' · marge nette : <b>'+fmt0(r.marge)+' €</b></div>'+
-      (r.alternative?'<div class="meta">autre régime ('+r.alternative.regime+') : '+fmt0(r.alternative.prixTTC)+' € TTC</div>':'')+
-      '</div>';
-  }).join("");
+function nego(){
+  var o=oeuvre(), ttc=num(v("ttcnego")), transport=num(v("transport")), lieu=v("lieu"), acq=v("acq"), box=document.getElementById("res2");
+  if(!o.C||!ttc){box.innerHTML='<div class="res empty">Saisissez le coût et le prix TTC négocié.</div>';return;}
+  var exo=false,fixe=null;
+  if(lieu==="EXPORT"){exo=true;fixe="EXPORT";} else if(lieu==="CEE"&&acq==="professionnel"){exo=true;fixe="INTRACOM";}
+  var dsOk=o.dsElig&&lieu!=="EXPORT";
+  function calc(rg){var tva=0; if(rg==="DC_55")tva=ttc*TR/(1+TR); else if(rg==="MARGE")tva=Math.max(0,ttc-o.C)*TM/(1+TM);
+    var ht=ttc-tva, ds=dsOk?baremeDS(ht):0, m=ht-o.C-transport-ds;
+    return {rg:rg,tva:r2(tva),ht:r2(ht),ds:r2(ds),m:r2(m),tx:ht?m/ht:0};}
+  var best,alt=null;
+  if(exo){best=calc(fixe);} else {var cands=o.margeElig?["DC_55","MARGE"]:["DC_55"]; cands.forEach(function(rg){var r=calc(rg); if(!best||r.m>best.m){alt=best;best=r;}else alt=r;});}
+  var h='<div class="res"><div class="lbl">Marge finale sur la vente</div><div class="big'+(best.m<0?' ko':'')+'">'+f0(best.m)+' €</div>'+
+    '<span class="tag '+best.rg+'">'+LBL[best.rg]+'</span> <span style="font-size:13px;color:var(--muted)">taux '+pct(best.tx)+'</span>'+
+    '<div class="line"><span>Prix TTC négocié</span><b>'+f0(ttc)+' €</b></div>'+
+    '<div class="line"><span>TVA</span><b>'+(best.tva>0?f0(best.tva)+' €':'exonérée')+'</b></div>'+
+    '<div class="line"><span>Prix HT réalisé</span><b>'+f0(best.ht)+' €</b></div>'+
+    '<div class="line"><span>− Coût d\'acquisition</span><b>'+f0(o.C)+' €</b></div>'+
+    (transport?'<div class="line"><span>− Transport</span><b>'+f0(transport)+' €</b></div>':'')+
+    (best.ds?'<div class="line"><span>− Droit de suite</span><b>'+f0(best.ds)+' €</b></div>':'')+'</div>';
+  if(alt&&!exo&&o.margeElig) h+='<div class="note">Autre régime ('+LBL[alt.rg]+') : marge '+f0(alt.m)+' €.</div>';
+  var taux=num(v("taux"));
+  if(taux){var pv=r2(o.C/(1-taux/100)), askMarge=r2(pv-o.C-(o.dsElig?baremeDS(pv):0)), diff=r2(best.m-askMarge);
+    h+='<div class="note">Objectif (asking) : marge '+f0(askMarge)+' € — '+(diff>=0?'au-dessus de +'+f0(diff)+' €':'en dessous de '+f0(diff)+' €')+'.</div>';}
+  box.innerHTML=h;
 }
-["cout","marge","unite","eligible","ds","commission"].forEach(function(id){
-  var e=document.getElementById(id); if(!e) return;
-  ["input","change","keyup"].forEach(function(ev){ e.addEventListener(ev,render); });
+function render(){asking();nego();}
+["cout","achat","tvarecup","dseli","taux","acq","lieu","transport","ttcnego"].forEach(function(id){
+  var e=document.getElementById(id); if(!e)return; ["input","change","keyup"].forEach(function(ev){e.addEventListener(ev,render);});
 });
-var bc=document.getElementById("btn-calc"); if(bc) bc.addEventListener("click",render);
+document.getElementById("calc1").addEventListener("click",render);
+document.getElementById("calc2").addEventListener("click",render);
+function tab(n){document.getElementById("t1").classList.toggle("on",n===1);document.getElementById("t2").classList.toggle("on",n===2);
+  document.getElementById("pane1").classList.toggle("on",n===1);document.getElementById("pane2").classList.toggle("on",n===2);}
+document.getElementById("t1").addEventListener("click",function(){tab(1);});
+document.getElementById("t2").addEventListener("click",function(){tab(2);});
 render();
-/* Service worker (hors-ligne) — actif uniquement quand l'appli est hébergée (http/https). */
-if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){
-  navigator.serviceWorker.register("service-worker.js").catch(function(){});
-}
+if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){navigator.serviceWorker.register("service-worker.js").catch(function(){});}
 </script>
 </body>
 </html>

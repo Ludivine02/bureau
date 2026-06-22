@@ -42,24 +42,44 @@
 <!-- ============ SIMULATEUR (écran principal) ============ -->
 <section class="view active" id="view-simulateur">
   <div class="panel">
-    <h2>Simulateur de prix &amp; marge</h2>
-    <p class="lead">Sur un stand : saisissez le coût de l'œuvre et la marge nette visée → l'outil donne <b>le prix à annoncer</b> et la <b>marge optimisée</b> pour chaque profil d'acheteur, en choisissant automatiquement le régime de TVA le plus avantageux.</p>
-    <div class="grid wide">
-      <label class="fld"><span>Coût d'acquisition de l'œuvre (€)</span><input id="sim-cout" type="number" step="0.01" inputmode="decimal" placeholder="ex. 100000"></label>
-      <label class="fld"><span>Marge nette visée</span>
-        <div style="display:flex; gap:6px">
-          <input id="sim-marge" type="number" step="0.01" inputmode="decimal" placeholder="ex. 50" style="flex:1">
-          <select id="sim-marge-unite" style="max-width:130px"><option value="pct">% du coût</option><option value="eur">€ (montant)</option></select>
-        </div></label>
-    </div>
-    <div class="grid wide">
-      <label class="fld" style="display:flex;align-items:center;gap:8px"><input id="sim-eligible" type="checkbox" checked style="width:auto"><span style="margin:0">Œuvre achetée sans TVA → <b>régime de la marge possible</b></span></label>
-      <label class="fld" style="display:flex;align-items:center;gap:8px"><input id="sim-ds" type="checkbox" style="width:auto"><span style="margin:0">Revente d'un artiste éligible → <b>droit de suite</b> à déduire</span></label>
-      <label class="fld"><span>Commission éventuelle (% du HT)</span><input id="sim-commission" type="number" step="0.1" inputmode="decimal" placeholder="0"></label>
-    </div>
-    <div id="sim-result"></div>
-    <div class="disclaimer">Le régime retenu par profil est celui qui maximise votre marge (pour un particulier France/UE : arbitrage automatique marge 20% / droit commun 5,5% — option 297 C). Prix à annoncer : <b>TTC</b> pour un particulier, <b>HT</b> pour un professionnel (qui récupère la TVA). Export hors UE et livraison intracommunautaire à un pro : exonérés. Indicatif — à confirmer (justificatifs export/intracom, qualité du vendeur, 1ère cession pour le droit de suite).</div>
+    <h2>Simulateur</h2>
+    <p class="lead">Deux outils : <b>1. Asking</b> (prix de vente HT à demander) et <b>2. Aide à la négociation</b> (marge finale selon l'offre du client). Renseignez d'abord l'œuvre, commune aux deux.</p>
+    <fieldset>
+      <legend>L'œuvre (commun aux deux simulations)</legend>
+      <div class="grid wide">
+        <label class="fld"><span>Coût d'acquisition HT de l'œuvre (€)</span><input id="sim-cout" type="number" step="0.01" inputmode="decimal" placeholder="ex. 100000"></label>
+        <label class="fld"><span>Œuvre achetée à…</span>
+          <select id="sim-achat-aupres"><option value="particulier">un particulier</option><option value="professionnel">un professionnel</option></select></label>
+        <label class="fld"><span>L'acquisition a-t-elle donné droit à récupération de TVA ?</span>
+          <select id="sim-tva-recup"><option value="non">Non (→ régime de la marge possible)</option><option value="oui">Oui (→ droit commun)</option></select></label>
+        <label class="fld"><span>Vente d'un artiste éligible au droit de suite ?</span>
+          <select id="sim-ds-eligible"><option value="non">Non</option><option value="oui">Oui</option></select></label>
+      </div>
+    </fieldset>
   </div>
+
+  <div class="grid wide">
+    <div class="panel">
+      <h3>1 · Asking — prix de vente HT à demander</h3>
+      <label class="fld"><span>Taux de marge attendu (sur le prix de vente HT) %</span><input id="sim-taux" type="number" step="0.1" inputmode="decimal" placeholder="ex. 40"></label>
+      <div id="asking-result"></div>
+    </div>
+
+    <div class="panel">
+      <h3>2 · Aide à la négociation — marge finale</h3>
+      <div class="grid">
+        <label class="fld"><span>Qualité de l'acquéreur</span>
+          <select id="sim-acquereur"><option value="particulier">Particulier</option><option value="professionnel">Professionnel</option></select></label>
+        <label class="fld"><span>Lieu de livraison de l'œuvre</span>
+          <select id="sim-lieu"><option value="FR">France</option><option value="CEE">CEE (UE)</option><option value="MONACO">Monaco</option><option value="EXPORT">Export (hors UE)</option></select></label>
+        <label class="fld"><span>Frais de transport (€)</span><input id="sim-transport" type="number" step="0.01" inputmode="decimal" placeholder="0"></label>
+        <label class="fld"><span>Prix TTC négocié par le client (€)</span><input id="sim-ttc-nego" type="number" step="0.01" inputmode="decimal" placeholder="ex. 150000"></label>
+      </div>
+      <div id="nego-result"></div>
+    </div>
+  </div>
+
+  <div class="panel"><div class="disclaimer">Marge finale = Prix HT réalisé − coût d'acquisition − frais de transport − droit de suite. Pour un particulier France/UE éligible à la marge, l'outil retient le régime le plus avantageux (marge 20% ou droit commun 5,5% — option 297 C). Monaco est assimilé à la France ; export hors UE et livraison intracom (pro UE) sont exonérés. Indicatif — justificatifs et 1ère cession à confirmer.</div></div>
 </section>
 
 <!-- ============ 0. TABLEAU DE BORD ============ -->

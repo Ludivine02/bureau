@@ -676,42 +676,65 @@
    * ================================================================= */
   function renderSimulateur() {
     const cout = R.num($("sim-cout").value);
-    if (!cout) { $("sim-result").innerHTML = '<div class="empty">Saisissez le coût de l\'œuvre pour lancer la simulation.</div>'; return; }
-    const params = {
-      cout: cout,
-      margeValeur: $("sim-marge").value,
-      margeUnite: $("sim-marge-unite").value,
-      margeEligible: $("sim-eligible").checked,
-      droitDeSuite: $("sim-ds").checked,
-      commissionPct: $("sim-commission").value
+    const tvaRecup = $("sim-tva-recup").value;
+    const oeuvre = {
+      coutHT: cout,
+      margeEligible: R.margeEligibleDe(tvaRecup),
+      dsEligible: $("sim-ds-eligible").value === "oui"
     };
-    const res = R.simulerPrix(params);
-    const margeEur = R.r2(params.margeUnite === "pct" ? (R.num(params.margeValeur) / 100) * cout : R.num(params.margeValeur));
-    const minPrix = Math.min.apply(null, res.map(r => r.prixAnnonce));
+    renderAsking(oeuvre);
+    renderNego(oeuvre);
+  }
 
-    let h = '<div class="kpi-row">' +
-      kpi(fmt0(cout) + " €", "Coût d'acquisition") +
-      kpi(fmt0(margeEur) + " €", "Marge nette visée") +
-      kpi(pct(cout ? margeEur / cout : 0), "soit, sur le coût") + '</div>';
+  function renderAsking(o) {
+    const box = $("asking-result");
+    const taux = R.num($("sim-taux").value);
+    if (!o.coutHT || !taux) { box.innerHTML = '<div class="empty">Saisissez le coût et le taux de marge attendu.</div>'; return; }
+    const r = R.simulerAsking({ coutHT: o.coutHT, margeEligible: o.margeEligible, dsEligible: o.dsEligible, tauxMarge: taux });
+    let h = '<div class="result-card"><small>Prix de vente HT espéré</small>' +
+      '<div class="regime">' + fmt(r.pvHT) + ' €</div>' +
+      '<div class="nums">' +
+      '<div><small>Marge HT</small><b>' + fmt(r.margeHT) + ' €</b></div>' +
+      '<div><small>Taux de marge</small><b>' + pct(r.tauxMarge) + '</b></div>' +
+      '<div><small>Régime probable</small><b style="font-size:13px">' + esc(r.regimeProbable) + '</b></div>' +
+      '<div><small>Prix TTC indicatif (France, 5,5%)</small><b>' + fmt(r.ttcFranceParticulier) + ' €</b></div>' +
+      '</div></div>';
+    if (o.dsEligible) h += '<div class="alert info" style="margin-top:8px">Droit de suite estimé à ce prix : <b>' + fmt(r.ds) + ' €</b> — marge HT après droit de suite : <b>' + fmt(r.margeApresDS) + ' €</b>.</div>';
+    box.innerHTML = h;
+  }
 
-    h += '<div class="table-wrap"><table><thead><tr>' +
-      '<th>Profil d\'acheteur</th><th>Régime retenu</th><th class="num">Prix à annoncer</th>' +
-      '<th class="num">dont TVA</th><th class="num">Droit de suite</th><th class="num">Marge nette</th></tr></thead><tbody>';
-    res.forEach(r => {
-      const best = Math.abs(r.prixAnnonce - minPrix) < 0.5;
-      h += '<tr' + (best ? ' style="background:#e7f4e8"' : '') + '>' +
-        '<td><b>' + esc(r.label) + '</b></td>' +
-        '<td><span class="tag ' + r.regimeCode + '">' + esc(r.regime) + '</span>' +
-        (r.alternative ? '<br><small style="color:var(--muted)">sinon ' + esc(r.alternative.regime) + ' : ' + fmt0(r.alternative.prixTTC) + ' € TTC</small>' : '') + '</td>' +
-        '<td class="num"><b style="font-size:15px">' + fmt0(r.prixAnnonce) + ' €</b> <small>' + r.baseAnnonce + '</small>' +
-        (r.baseAnnonce === "HT" && r.tva > 0 ? '<br><small style="color:var(--muted)">soit ' + fmt0(r.prixTTC) + ' € TTC</small>' : '') + '</td>' +
-        '<td class="num">' + (r.tva > 0 ? fmt0(r.tva) : "—") + '</td>' +
-        '<td class="num">' + (r.ds > 0 ? fmt0(r.ds) : "—") + '</td>' +
-        '<td class="num">' + fmt0(r.margeNette) + ' €</td></tr>';
+  function renderNego(o) {
+    const box = $("nego-result");
+    const ttc = R.num($("sim-ttc-nego").value);
+    if (!o.coutHT || !ttc) { box.innerHTML = '<div class="empty">Saisissez le coût de l\'œuvre et le prix TTC négocié.</div>'; return; }
+    const r = R.simulerNegociation({
+      coutHT: o.coutHT, margeEligible: o.margeEligible, dsEligible: o.dsEligible,
+      acquereur: $("sim-acquereur").value, lieu: $("sim-lieu").value,
+      transport: $("sim-transport").value, prixTTCnego: ttc
     });
-    h += '</tbody></table></div>';
-    h += '<div class="alert info" style="margin-top:10px">💡 Le prix le plus compétitif (surligné) correspond à un acheteur <b>hors UE</b> ou <b>professionnel UE</b> : exonérés de TVA, vous proposez un prix plus bas <b>à marge nette égale</b> — ou vous gagnez davantage au même prix.</div>';
-    $("sim-result").innerHTML = h;
+    const alarme = r.marge < 0;
+    let h = '<div class="result-card"><small>Marge finale sur la vente</small>' +
+      '<div class="regime" style="color:' + (alarme ? "var(--danger)" : "var(--brand-d)") + '">' + fmt(r.marge) + ' €</div>' +
+      '<span class="tag ' + r.regimeCode + '">' + esc(r.regime) + '</span> ' +
+      '<span style="font-size:13px;color:var(--muted)">taux de marge ' + pct(r.tauxMarge) + '</span>' +
+      '<div class="nums" style="margin-top:10px">' +
+      '<div><small>Prix TTC négocié</small><b>' + fmt(r.ttc) + ' €</b></div>' +
+      '<div><small>TVA</small><b>' + (r.tva > 0 ? fmt(r.tva) + ' €' : "exonérée") + '</b></div>' +
+      '<div><small>Prix HT réalisé</small><b>' + fmt(r.ht) + ' €</b></div>' +
+      '<div><small>Coût d\'acquisition</small><b>− ' + fmt(o.coutHT) + ' €</b></div>' +
+      (r.transport ? '<div><small>Frais de transport</small><b>− ' + fmt(r.transport) + ' €</b></div>' : '') +
+      (r.ds ? '<div><small>Droit de suite</small><b>− ' + fmt(r.ds) + ' €</b></div>' : '') +
+      '</div></div>';
+    if (r.alternative) h += '<div class="alert info" style="margin-top:8px">Régime retenu : le plus avantageux. Autre option (' + esc(r.alternative.regime) + ') : marge ' + fmt(r.alternative.marge) + ' €.</div>';
+    // Comparaison à l'objectif d'asking
+    const taux = R.num($("sim-taux").value);
+    if (taux) {
+      const ask = R.simulerAsking({ coutHT: o.coutHT, margeEligible: o.margeEligible, dsEligible: o.dsEligible, tauxMarge: taux });
+      const diff = R.r2(r.marge - ask.margeApresDS);
+      h += '<div class="alert ' + (diff >= 0 ? "info" : "warn") + '" style="margin-top:8px">Objectif (asking) : marge ' + fmt(ask.margeApresDS) + ' € — ' +
+        (diff >= 0 ? 'vous êtes <b>au-dessus</b> de +' + fmt(diff) + ' €.' : 'vous êtes <b>en dessous</b> de ' + fmt(diff) + ' €.') + '</div>';
+    }
+    box.innerHTML = h;
   }
 
   /* =================================================================
@@ -1194,7 +1217,8 @@
     $("file-input").onchange = (e) => { if (e.target.files[0]) importerFichier(e.target.files[0]); e.target.value = ""; };
     $("db-from").onchange = renderDashboard; $("db-to").onchange = renderDashboard;
     $("db-reset-period").onclick = () => { $("db-from").value = ""; $("db-to").value = ""; renderDashboard(); };
-    ["sim-cout", "sim-marge", "sim-marge-unite", "sim-eligible", "sim-ds", "sim-commission"].forEach(id => {
+    ["sim-cout", "sim-achat-aupres", "sim-tva-recup", "sim-ds-eligible", "sim-taux",
+      "sim-acquereur", "sim-lieu", "sim-transport", "sim-ttc-nego"].forEach(id => {
       const e = $(id); if (e) { e.addEventListener("input", renderSimulateur); e.addEventListener("change", renderSimulateur); }
     });
     $("btn-recenser").onclick = () => { const n = recenserArtistes(); save(); refreshAll(); alert(n + " artiste(s) ajouté(s) au référentiel."); };

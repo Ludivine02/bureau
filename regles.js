@@ -357,77 +357,70 @@ const REGLES = (function () {
   }
 
   /* =================================================================
-   *  SIMULATEUR FOIRE : coût + marge nette cible -> prix à annoncer
-   *  par profil d'acheteur, avec choix automatique du régime optimal.
-   * -----------------------------------------------------------------
-   *  params : {
-   *    cout,                         // coût d'acquisition (HT)
-   *    margeValeur, margeUnite,      // marge nette visée : 'eur' ou 'pct' (% du coût)
-   *    margeEligible (bool),         // œuvre achetée sans TVA -> régime de marge possible
-   *    commissionPct (0..100),       // commission éventuelle (% du HT)
-   *    droitDeSuite (bool)           // revente d'artiste éligible -> droit de suite déduit
-   *  }
-   *  Marge nette = HT encaissé - coût - commission - droit de suite.
-   *  Retour : un tableau de profils avec prix à annoncer, TVA, DdS, régime, marge.
+   *  SIMULATEUR — 2 modes
+   *  Données communes de l'œuvre : coutHT, achatAupres ('particulier'|'professionnel'),
+   *  tvaRecuperable ('oui'|'non'), dsEligible (bool).
    * ================================================================= */
-  function simulerPrix(p) {
-    const C = num(p.cout);
-    const M = (p.margeUnite === "pct") ? (num(p.margeValeur) / 100) * C : num(p.margeValeur);
-    const comm = num(p.commissionPct) / 100;
-    const dsOn = !!p.droitDeSuite;
-    const eligible = !!p.margeEligible;
 
-    const profils = [
-      { key: "part_fr", label: "Particulier — France", zone: "FR", type: "particulier" },
-      { key: "part_ue", label: "Particulier — UE", zone: "UE", type: "particulier" },
-      { key: "pro_fr", label: "Professionnel — France", zone: "FR", type: "professionnel" },
-      { key: "pro_ue", label: "Professionnel — UE (intracom)", zone: "UE", type: "professionnel" },
-      { key: "export", label: "Client hors UE (export)", zone: "HUE", type: "particulier" }
-    ];
+  // Le régime de la marge est possible si l'acquisition n'a PAS ouvert droit à
+  // récupération de TVA (achat à un particulier, ou à un pro sans TVA déductible).
+  function margeEligibleDe(tvaRecuperable) { return tvaRecuperable !== "oui"; }
 
-    function tvaDe(P, regime) {
-      if (regime === "EXPORT" || regime === "INTRACOM") return 0;
-      if (regime === "DC_55") return P * PARAMS.tva.tauxReduitArt / (1 + PARAMS.tva.tauxReduitArt);
-      if (regime === "MARGE") { const m = Math.max(0, P - C); return m * PARAMS.tva.tauxMargeUnique / (1 + PARAMS.tva.tauxMargeUnique); }
-      return 0;
-    }
-    function netDe(P, zone, regime) {
-      const vat = tvaDe(P, regime), ht = P - vat;
-      const ds = (dsOn && (zone === "FR" || zone === "UE")) ? baremeDroitDeSuite(ht) : 0;
-      return ht - C - comm * ht - ds;
-    }
-    function prixPourMarge(zone, regime) { // bissection (marge nette croissante avec P)
-      let lo = 0, hi = Math.max(C, 1) * 1000 + Math.abs(M) * 10 + 1e6;
-      for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; (netDe(mid, zone, regime) < M) ? lo = mid : hi = mid; }
-      return (lo + hi) / 2;
-    }
+  /* --- Mode 1 : ASKING — prix de vente HT espéré ---
+   * params : { coutHT, margeEligible, dsEligible, tauxMarge (% sur le PV HT) }
+   * PV HT espéré tel que marge HT / PV HT = taux  ->  PV HT = coût / (1 - taux). */
+  function simulerAsking(p) {
+    const C = num(p.coutHT);
+    const taux = num(p.tauxMarge) / 100;
+    const pvHT = (taux < 1 && taux >= 0) ? r2(C / (1 - taux)) : 0;
+    const margeHT = r2(pvHT - C);
+    const ds = p.dsEligible ? r2(baremeDroitDeSuite(pvHT)) : 0;
+    return {
+      pvHT: pvHT,
+      margeHT: margeHT,
+      margeApresDS: r2(margeHT - ds),
+      ds: ds,
+      tauxMarge: taux,
+      regimeProbable: p.margeEligible ? "Régime de la marge (20% sur marge)" : "Droit commun 5,5%",
+      // Prix TTC indicatif pour un particulier France (taux réduit 5,5%)
+      ttcFranceParticulier: r2(pvHT * (1 + PARAMS.tva.tauxReduitArt))
+    };
+  }
 
-    return profils.map(pr => {
-      let regimes;
-      if (pr.zone === "HUE") regimes = ["EXPORT"];
-      else if (pr.zone === "UE" && pr.type === "professionnel") regimes = ["INTRACOM"];
-      else { regimes = ["DC_55"]; if (eligible) regimes.push("MARGE"); }
+  /* --- Mode 2 : AIDE À LA NÉGOCIATION — marge finale sur un TTC négocié ---
+   * params : { coutHT, margeEligible, dsEligible, acquereur ('particulier'|'professionnel'),
+   *            lieu ('FR'|'CEE'|'MONACO'|'EXPORT'), transport (€), prixTTCnego } */
+  function simulerNegociation(p) {
+    const C = num(p.coutHT), transport = num(p.transport), ttc = num(p.prixTTCnego);
+    const lieu = p.lieu, acq = p.acquereur;
+    const margeEligible = !!p.margeEligible, dsEligible = !!p.dsEligible;
 
-      // Régime retenu = celui qui minimise le prix à atteindre (= maximise la marge à prix donné).
-      let best = null, alt = null;
-      regimes.forEach(rg => {
-        const P = prixPourMarge(pr.zone, rg);
-        if (!best || P < best.P) { alt = best; best = { rg, P }; }
-        else alt = { rg, P };
-      });
-      const regime = best.rg, P = best.P;
-      const vat = tvaDe(P, regime), ht = P - vat;
-      const ds = (dsOn && (pr.zone === "FR" || pr.zone === "UE")) ? baremeDroitDeSuite(ht) : 0;
+    // Territorialité : Monaco assimilé à la France ; CEE = UE.
+    let exo = false, regimeFixe = null;
+    if (lieu === "EXPORT") { exo = true; regimeFixe = "EXPORT"; }
+    else if (lieu === "CEE" && acq === "professionnel") { exo = true; regimeFixe = "INTRACOM"; }
+    const dsDansLeChamp = dsEligible && lieu !== "EXPORT"; // hors champ à l'export (pratique galerie)
+
+    function calc(rg) {
+      let tva = 0;
+      if (rg === "DC_55") tva = ttc * PARAMS.tva.tauxReduitArt / (1 + PARAMS.tva.tauxReduitArt);
+      else if (rg === "MARGE") tva = Math.max(0, ttc - C) * PARAMS.tva.tauxMargeUnique / (1 + PARAMS.tva.tauxMargeUnique);
+      const ht = ttc - tva;
+      const ds = dsDansLeChamp ? baremeDroitDeSuite(ht) : 0;
+      const marge = ht - C - transport - ds;
       return {
-        key: pr.key, label: pr.label, zone: pr.zone, type: pr.type,
-        regime: LISTES.regimes[regime].label, regimeCode: regime,
-        prixTTC: r2(P), prixHT: r2(ht), tva: r2(vat), ds: r2(ds), commission: r2(comm * ht),
-        prixAnnonce: r2(pr.type === "professionnel" ? ht : P),
-        baseAnnonce: pr.type === "professionnel" ? "HT" : "TTC",
-        margeNette: r2(M),
-        alternative: (alt && regimes.length > 1) ? { regime: LISTES.regimes[alt.rg].label, prixTTC: r2(alt.P) } : null
+        regimeCode: rg, regime: LISTES.regimes[rg] ? LISTES.regimes[rg].label : rg,
+        tva: r2(tva), ht: r2(ht), ds: r2(ds), transport: r2(transport), ttc: r2(ttc),
+        marge: r2(marge), tauxMarge: ht ? marge / ht : 0
       };
-    });
+    }
+    if (exo) return calc(regimeFixe);
+    // Taxable (France / Monaco / CEE particulier) : meilleur régime au TTC donné.
+    const cands = margeEligible ? ["DC_55", "MARGE"] : ["DC_55"];
+    let best = null, alt = null;
+    cands.forEach(rg => { const r = calc(rg); if (!best || r.marge > best.marge) { alt = best; best = r; } else alt = r; });
+    if (alt && cands.length > 1) best.alternative = alt;
+    return best;
   }
   function affecterCompte(out, v, codeRegime) {
     const compte = compteDe(v, codeRegime);
@@ -527,7 +520,7 @@ const REGLES = (function () {
    * ================================================================= */
   return {
     PARAMS, LISTES, PLAN_COMPTES, CADRAGE,
-    calculerTVA, calculerDroitDeSuite, calculerTaxeForfaitaire, simulerPrix,
+    calculerTVA, calculerDroitDeSuite, calculerTaxeForfaitaire, simulerAsking, simulerNegociation, margeEligibleDe,
     controlerLigne, baremeDroitDeSuite, estCutoff, r2, num
   };
 })();
